@@ -12,6 +12,7 @@
     <!-- HOME -->
     <section id="home" class="active">
       <h1>Avalon</h1>
+      <p style="color:var(--text-dim); text-align:center; margin-bottom:0.5rem">Offline game assistant</p>
       <div class="card">
         <input type="text" id="playerName" placeholder="Your name" maxlength="20" autocomplete="off">
       </div>
@@ -26,13 +27,10 @@
     <section id="lobby">
       <h1>Game Lobby</h1>
       <div class="game-code" id="lobbyCode"></div>
+      <p style="color:var(--text-dim); text-align:center; font-size:0.85rem">Share this code with other players</p>
       <div class="card">
         <h2>Players (<span id="playerCount">0</span>)</h2>
         <ul class="player-list" id="lobbyPlayers"></ul>
-        <div class="btn-group" id="aiButtons" style="margin-top:0.75rem; display:none">
-          <button class="btn" id="addAIBtn">+ Add AI</button>
-          <button class="btn" id="removeAIBtn">- Remove AI</button>
-        </div>
       </div>
 
       <!-- Config (host only) -->
@@ -91,80 +89,51 @@
       <button class="btn btn-primary btn-full" id="ackBtn">I've seen my role</button>
     </section>
 
-    <!-- TEAM PROPOSAL -->
-    <section id="teamProposal">
-      <div class="quest-board" id="tpQuestBoard"></div>
-      <div class="role-info-bar" id="tpRoleBar"></div>
-      <div class="status-bar">
-        <span>Quest <span id="tpQuestNum">1</span> &mdash; Team size: <span id="tpTeamSize">2</span></span>
-        <div class="reject-tracker" id="tpRejects"></div>
-      </div>
-      <div id="tpLeaderView" style="display:none">
-        <div class="card">
-          <h2>Select your team</h2>
-          <ul class="player-list" id="tpPlayerList"></ul>
-        </div>
-        <button class="btn btn-primary btn-full" id="proposeBtn">Propose Team</button>
-      </div>
-      <div id="tpWaitView" class="waiting" style="display:none">
-        <span id="tpLeaderName"></span> is choosing a team<span class="dots"></span>
-      </div>
-    </section>
+    <!-- QUEST TRACKING -->
+    <section id="questTrack">
+      <div class="quest-board" id="qtQuestBoard"></div>
+      <div class="role-info-bar" id="qtRoleBar"></div>
 
-    <!-- TEAM VOTE -->
-    <section id="teamVote">
-      <div class="quest-board" id="tvQuestBoard"></div>
-      <div class="role-info-bar" id="tvRoleBar"></div>
       <div class="card">
-        <h2>Proposed Team</h2>
-        <ul class="player-list" id="tvTeamList"></ul>
+        <h2>Quest <span id="qtQuestNum">1</span></h2>
+        <p style="color:var(--text-dim); font-size:0.9rem">
+          Team size: <strong id="qtTeamSize">2</strong>
+          <span id="qtDoubleFail" style="display:none"> (needs 2 fails)</span>
+        </p>
       </div>
-      <div id="tvVoteView">
-        <div class="status-bar">
-          <span>Votes: <span id="tvVoteCount">0</span>/<span id="tvTotalPlayers">0</span></span>
-          <div class="reject-tracker" id="tvRejects"></div>
+
+      <!-- Host controls -->
+      <div id="qtHostView" style="display:none">
+        <p style="text-align:center; color:var(--text-dim); font-size:0.85rem; margin-bottom:0.5rem">
+          Discuss, vote, and quest in person. Then record the result:
+        </p>
+        <div class="btn-group">
+          <button class="btn btn-good" onclick="recordQuest('success')">Quest Success</button>
+          <button class="btn btn-evil" onclick="recordQuest('fail')">Quest Fail</button>
         </div>
-        <div class="btn-group" id="tvButtons">
-          <button class="btn btn-good" onclick="castVote('approve')">Approve</button>
-          <button class="btn btn-evil" onclick="castVote('reject')">Reject</button>
-        </div>
-        <div id="tvWaiting" class="waiting" style="display:none">Waiting for votes<span class="dots"></span></div>
+      </div>
+
+      <!-- Non-host view -->
+      <div id="qtPlayerView" class="waiting" style="display:none">
+        Play the game in person. Host will record results.<span class="dots"></span>
       </div>
     </section>
 
-    <!-- QUEST -->
-    <section id="quest">
-      <div class="quest-board" id="qQuestBoard"></div>
-      <div class="role-info-bar" id="qRoleBar"></div>
-      <div class="card">
-        <h2>Quest <span id="qQuestNum">1</span></h2>
-        <p style="color:var(--text-dim); font-size:0.9rem">Team: <span id="qTeamNames"></span></p>
-      </div>
-      <div id="qVoteView" style="display:none">
-        <p style="text-align:center; margin-bottom:0.5rem">Play your card</p>
-        <div class="btn-group" id="qButtons">
-          <button class="btn btn-good" onclick="questVote('success')">Success</button>
-          <button class="btn btn-evil" id="qFailBtn" onclick="questVote('fail')">Fail</button>
-        </div>
-      </div>
-      <div id="qWaiting" class="waiting" style="display:none">
-        Quest in progress: <span id="qVoteCount">0</span>/<span id="qTeamSize">0</span><span class="dots"></span>
-      </div>
-    </section>
-
-    <!-- ASSASSIN GUESS -->
+    <!-- ASSASSIN GUESS (host records) -->
     <section id="assassin">
       <div class="quest-board" id="aQuestBoard"></div>
-      <div id="aAssassinView" style="display:none">
+
+      <div id="aHostView" style="display:none">
         <div class="card">
-          <h2>You are the Assassin</h2>
-          <p style="color:var(--text-dim); margin-bottom:0.75rem">Good completed 3 quests. Choose who you think is Merlin.</p>
+          <h2>Assassin Phase</h2>
+          <p style="color:var(--text-dim); margin-bottom:0.75rem">Good completed 3 quests! The Assassin now guesses who Merlin is. Select the target:</p>
           <ul class="player-list" id="aPlayerList"></ul>
         </div>
-        <button class="btn btn-evil btn-full" id="assassinBtn">Assassinate</button>
+        <button class="btn btn-evil btn-full" id="assassinBtn">Confirm Assassination</button>
       </div>
-      <div id="aWaiting" class="waiting" style="display:none">
-        Assassin is choosing<span class="dots"></span>
+
+      <div id="aPlayerWait" class="waiting" style="display:none">
+        Assassin phase in progress<span class="dots"></span>
       </div>
     </section>
 
@@ -176,9 +145,9 @@
         <h2>Roles</h2>
         <div class="role-reveal-list" id="goRoles"></div>
       </div>
-      <div class="card" id="goVoteHistory">
-        <h2>Vote History</h2>
-        <div id="goVotes"></div>
+      <div class="card">
+        <h2>Quest Results</h2>
+        <div class="quest-board" id="goQuestBoard"></div>
       </div>
       <button class="btn btn-primary btn-full" id="restartBtn" style="display:none">Play Again</button>
     </section>
@@ -188,6 +157,6 @@
   <div id="toastContainer"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

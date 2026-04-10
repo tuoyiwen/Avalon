@@ -1,7 +1,6 @@
 /* global io */
 const socket = io();
 let state = null;
-let selectedTeam = new Set();
 let assassinTarget = null;
 
 // --- Helpers ---
@@ -86,36 +85,24 @@ function updateConfig() {
 }
 
 $('startBtn').onclick = () => emit('start-game', {});
-
-// --- AI Players ---
-$('addAIBtn').onclick = () => emit('add-ai', {});
-$('removeAIBtn').onclick = () => emit('remove-ai', {});
-
-// --- Role Acknowledge ---
 $('ackBtn').onclick = () => emit('acknowledge-role', {});
+$('restartBtn').onclick = () => emit('restart-game', {});
 
-// --- Team Proposal ---
-$('proposeBtn').onclick = () => {
-  emit('propose-team', { team: Array.from(selectedTeam) });
-};
-
-// --- Voting ---
-function castVote(vote) {
-  emit('cast-vote', { vote });
+// --- Quest Recording (host only) ---
+function recordQuest(result) {
+  emit('record-quest', { result });
 }
 
-function questVote(vote) {
-  emit('quest-vote', { vote });
-}
-
-// --- Assassin ---
+// --- Assassin Guess (host records) ---
 $('assassinBtn').onclick = () => {
   if (!assassinTarget) return toast('Select a player');
   emit('assassin-guess', { targetId: assassinTarget });
 };
 
-// --- Restart ---
-$('restartBtn').onclick = () => emit('restart-game', {});
+function selectAssassinTarget(id) {
+  assassinTarget = id;
+  render(state);
+}
 
 // --- Quest Board Renderer ---
 function renderQuestBoard(containerId, st) {
@@ -125,20 +112,11 @@ function renderQuestBoard(containerId, st) {
     let cls = 'quest-slot';
     if (i === st.currentQuest && st.phase !== 'GAME_OVER') cls += ' current';
     const result = st.questResults[i];
-    if (result) cls += result.result === 'success' ? ' success' : ' fail';
+    if (result === 'success') cls += ' success';
+    else if (result === 'fail') cls += ' fail';
     const df = st.doubleFail[i] ? '<div class="df">2F</div>' : '';
     return `<div class="${cls}"><span>${size}</span>${df}</div>`;
   }).join('');
-}
-
-// --- Reject Tracker ---
-function renderRejects(containerId, count) {
-  const el = $(containerId);
-  let html = '';
-  for (let i = 0; i < 5; i++) {
-    html += `<div class="reject-dot${i < count ? ' filled' : ''}"></div>`;
-  }
-  el.innerHTML = html;
 }
 
 // --- Role Info Bar ---
@@ -146,10 +124,6 @@ function renderRoleBar(containerId, st) {
   const el = $(containerId);
   if (!st.you?.role) { el.innerHTML = ''; return; }
   const teamClass = st.you.team === 'GOOD' ? 'team-good' : 'team-evil';
-  let info = '';
-  if (st.you.knownInfo && st.you.knownInfo.length > 0) {
-    info = ' | Sees: ' + st.you.knownInfo.map(k => k.name).join(', ');
-  }
   el.innerHTML = `<span>You: <strong>${st.you.role}</strong></span><span class="role-team ${teamClass}" style="font-size:0.75rem; padding:0.15rem 0.5rem">${st.you.team}</span>`;
 }
 
@@ -163,9 +137,7 @@ function render(s) {
   switch (s.phase) {
     case 'LOBBY': renderLobby(s); break;
     case 'ROLE_REVEAL': renderRoleReveal(s); break;
-    case 'TEAM_PROPOSAL': renderTeamProposal(s); break;
-    case 'TEAM_VOTE': renderTeamVote(s); break;
-    case 'QUEST': renderQuest(s); break;
+    case 'QUEST_TRACK': renderQuestTrack(s); break;
     case 'ASSASSIN_GUESS': renderAssassin(s); break;
     case 'GAME_OVER': renderGameOver(s); break;
   }
@@ -178,15 +150,9 @@ function renderLobby(s) {
   $('lobbyPlayers').innerHTML = s.players.map(p => {
     const badges = [];
     if (p.isHost) badges.push('<span class="badge badge-host">Host</span>');
-    if (p.isAI) badges.push('<span class="badge badge-ai">AI</span>');
     if (p.id === s.you?.id) badges.push('<span class="badge badge-you">You</span>');
     return `<li class="player-item"><span>${p.name}</span><span>${badges.join(' ')}</span></li>`;
   }).join('');
-
-  // AI buttons visible only to host
-  $('aiButtons').style.display = s.you?.isHost ? '' : 'none';
-  const hasAI = s.players.some(p => p.isAI);
-  $('removeAIBtn').disabled = !hasAI;
 
   if (s.you?.isHost) {
     $('configPanel').style.display = '';
@@ -221,87 +187,20 @@ function renderRoleReveal(s) {
   }
 }
 
-function renderTeamProposal(s) {
-  show('teamProposal');
-  renderQuestBoard('tpQuestBoard', s);
-  renderRoleBar('tpRoleBar', s);
-  renderRejects('tpRejects', s.consecutiveRejects);
-  $('tpQuestNum').textContent = s.currentQuest + 1;
-  $('tpTeamSize').textContent = s.requiredTeamSize;
+function renderQuestTrack(s) {
+  show('questTrack');
+  renderQuestBoard('qtQuestBoard', s);
+  renderRoleBar('qtRoleBar', s);
+  $('qtQuestNum').textContent = s.currentQuest + 1;
+  $('qtTeamSize').textContent = s.questSizeNeeded;
+  $('qtDoubleFail').style.display = s.doubleFailNeeded ? '' : 'none';
 
-  const leader = s.players.find(p => p.isLeader);
-
-  if (s.you?.isLeader) {
-    $('tpLeaderView').style.display = '';
-    $('tpWaitView').style.display = 'none';
-
-    // Reset selection if new proposal round
-    if (selectedTeam.size > 0) {
-      // Keep valid selections
-      selectedTeam = new Set([...selectedTeam].filter(id => s.players.some(p => p.id === id)));
-    }
-
-    $('tpPlayerList').innerHTML = s.players.map(p => {
-      const sel = selectedTeam.has(p.id) ? ' selected' : '';
-      const you = p.id === s.you.id ? ' <span class="badge badge-you">You</span>' : '';
-      return `<li class="player-item${sel}" onclick="togglePlayer('${p.id}')"><span>${p.name}${you}</span></li>`;
-    }).join('');
-
-    $('proposeBtn').disabled = selectedTeam.size !== s.requiredTeamSize;
-    $('proposeBtn').textContent = `Propose Team (${selectedTeam.size}/${s.requiredTeamSize})`;
+  if (s.you?.isHost) {
+    $('qtHostView').style.display = '';
+    $('qtPlayerView').style.display = 'none';
   } else {
-    $('tpLeaderView').style.display = 'none';
-    $('tpWaitView').style.display = '';
-    $('tpLeaderName').textContent = leader ? leader.name : '?';
-  }
-}
-
-function togglePlayer(id) {
-  if (selectedTeam.has(id)) selectedTeam.delete(id);
-  else selectedTeam.add(id);
-  render(state);
-}
-
-function renderTeamVote(s) {
-  show('teamVote');
-  renderQuestBoard('tvQuestBoard', s);
-  renderRoleBar('tvRoleBar', s);
-  renderRejects('tvRejects', s.consecutiveRejects);
-
-  $('tvTeamList').innerHTML = s.teamProposal.map(p =>
-    `<li class="player-item"><span>${p.name}</span><span class="badge badge-team">Team</span></li>`
-  ).join('');
-
-  $('tvVoteCount').textContent = s.votesSubmitted;
-  $('tvTotalPlayers').textContent = s.players.length;
-
-  if (s.youVoted) {
-    $('tvButtons').style.display = 'none';
-    $('tvWaiting').style.display = '';
-  } else {
-    $('tvButtons').style.display = '';
-    $('tvWaiting').style.display = 'none';
-  }
-}
-
-function renderQuest(s) {
-  show('quest');
-  renderQuestBoard('qQuestBoard', s);
-  renderRoleBar('qRoleBar', s);
-  $('qQuestNum').textContent = s.currentQuest + 1;
-  $('qTeamNames').textContent = s.teamProposal.map(p => p.name).join(', ');
-  $('qVoteCount').textContent = s.questVotesSubmitted;
-  $('qTeamSize').textContent = s.teamProposal.length;
-
-  const isOnTeam = s.you?.isOnTeam;
-  if (isOnTeam && !s.youVoted) {
-    $('qVoteView').style.display = '';
-    $('qWaiting').style.display = 'none';
-    // Good players can't fail
-    $('qFailBtn').style.display = s.you.team === 'GOOD' ? 'none' : '';
-  } else {
-    $('qVoteView').style.display = 'none';
-    $('qWaiting').style.display = '';
+    $('qtHostView').style.display = 'none';
+    $('qtPlayerView').style.display = '';
   }
 }
 
@@ -309,27 +208,20 @@ function renderAssassin(s) {
   show('assassin');
   renderQuestBoard('aQuestBoard', s);
 
-  if (s.isAssassin) {
-    $('aAssassinView').style.display = '';
-    $('aWaiting').style.display = 'none';
+  if (s.you?.isHost) {
+    $('aHostView').style.display = '';
+    $('aPlayerWait').style.display = 'none';
 
-    // Only show good players (or all if assassin doesn't know)
     $('aPlayerList').innerHTML = s.players.map(p => {
-      if (p.id === s.you.id) return '';
       const sel = assassinTarget === p.id ? ' selected' : '';
       return `<li class="player-item${sel}" onclick="selectAssassinTarget('${p.id}')"><span>${p.name}</span></li>`;
     }).join('');
 
     $('assassinBtn').disabled = !assassinTarget;
   } else {
-    $('aAssassinView').style.display = 'none';
-    $('aWaiting').style.display = '';
+    $('aHostView').style.display = 'none';
+    $('aPlayerWait').style.display = '';
   }
-}
-
-function selectAssassinTarget(id) {
-  assassinTarget = id;
-  render(state);
 }
 
 function renderGameOver(s) {
@@ -339,6 +231,8 @@ function renderGameOver(s) {
   $('goBanner').className = 'winner-banner ' + (goodWon ? 'good-wins' : 'evil-wins');
   $('goReason').textContent = s.winReason;
 
+  renderQuestBoard('goQuestBoard', s);
+
   $('goRoles').innerHTML = (s.revealedRoles || []).map(p =>
     `<div class="role-reveal-item">
       <span>${p.name} — ${p.role}</span>
@@ -346,25 +240,6 @@ function renderGameOver(s) {
     </div>`
   ).join('');
 
-  // Vote history
-  $('goVotes').innerHTML = (s.voteHistory || []).map((vh, i) => {
-    const votes = Object.entries(vh.votes).map(([name, v]) =>
-      `${name}: <span style="color:${v === 'approve' ? 'var(--good)' : 'var(--evil)'}">${v}</span>`
-    ).join(', ');
-    return `<div class="vote-history-entry">
-      <div>Round ${i + 1}: ${vh.leader} proposed [${vh.team.join(', ')}]</div>
-      <div>${votes}</div>
-      <div class="result ${vh.approved ? 'approved' : 'rejected'}">${vh.approved ? 'Approved' : 'Rejected'}</div>
-    </div>`;
-  }).join('');
-
-  if (s.you?.isHost) {
-    $('restartBtn').style.display = '';
-  } else {
-    $('restartBtn').style.display = 'none';
-  }
-
-  // Reset state for next game
-  selectedTeam = new Set();
+  $('restartBtn').style.display = s.you?.isHost ? '' : 'none';
   assassinTarget = null;
 }

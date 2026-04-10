@@ -114,7 +114,7 @@ input[type="text"]:focus { border-color: var(--accent); }
 .badge-leader { background: #f0a500; color: #111; }
 .badge-team { background: var(--good); color: #111; }
 .badge-you { background: var(--card); border: 1px solid var(--text-dim); }
-.badge-ai { background: #7b68ee; }
+
 
 /* Quest board */
 .quest-board {
