@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Avalon</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- HOME -->
+    <section id="home" class="active">
+      <h1>Avalon</h1>
+      <div class="card">
+        <input type="text" id="playerName" placeholder="Your name" maxlength="20" autocomplete="off">
+      </div>
+      <button class="btn btn-primary btn-full" id="createBtn">Create Game</button>
+      <div class="card">
+        <input type="text" id="joinCode" placeholder="Game code" maxlength="6" autocomplete="off" style="text-transform:uppercase; margin-bottom:0.75rem">
+        <button class="btn btn-full" id="joinBtn">Join Game</button>
+      </div>
+    </section>
+
+    <!-- LOBBY -->
+    <section id="lobby">
+      <h1>Game Lobby</h1>
+      <div class="game-code" id="lobbyCode"></div>
+      <div class="card">
+        <h2>Players (<span id="playerCount">0</span>)</h2>
+        <ul class="player-list" id="lobbyPlayers"></ul>
+      </div>
+
+      <!-- Config (host only) -->
+      <div class="card" id="configPanel" style="display:none">
+        <h2>Settings</h2>
+        <div class="config-row">
+          <label>Good players</label>
+          <div class="count-control">
+            <button class="btn" onclick="adjustCount('good',-1)">-</button>
+            <span class="count-value" id="goodCount">-</span>
+            <button class="btn" onclick="adjustCount('good',1)">+</button>
+          </div>
+        </div>
+        <div class="config-row">
+          <label>Evil players</label>
+          <div class="count-control">
+            <button class="btn" onclick="adjustCount('evil',-1)">-</button>
+            <span class="count-value" id="evilCount">-</span>
+            <button class="btn" onclick="adjustCount('evil',1)">+</button>
+          </div>
+        </div>
+        <hr style="border-color:var(--card); margin:0.5rem 0">
+        <div class="config-row">
+          <label>Merlin & Assassin</label>
+          <label class="toggle"><input type="checkbox" id="roleMerlin" checked onchange="updateConfig()"><span class="slider"></span></label>
+        </div>
+        <div class="config-row">
+          <label>Percival</label>
+          <label class="toggle"><input type="checkbox" id="rolePercival" checked onchange="updateConfig()"><span class="slider"></span></label>
+        </div>
+        <div class="config-row">
+          <label>Morgana</label>
+          <label class="toggle"><input type="checkbox" id="roleMorgana" checked onchange="updateConfig()"><span class="slider"></span></label>
+        </div>
+        <div class="config-row">
+          <label>Mordred</label>
+          <label class="toggle"><input type="checkbox" id="roleMordred" onchange="updateConfig()"><span class="slider"></span></label>
+        </div>
+        <div class="config-row">
+          <label>Oberon</label>
+          <label class="toggle"><input type="checkbox" id="roleOberon" onchange="updateConfig()"><span class="slider"></span></label>
+        </div>
+        <button class="btn btn-primary btn-full" id="startBtn" style="margin-top:0.75rem">Start Game</button>
+      </div>
+      <div id="waitingHost" class="waiting" style="display:none">Waiting for host to start<span class="dots"></span></div>
+    </section>
+
+    <!-- ROLE REVEAL -->
+    <section id="roleReveal">
+      <div class="card role-card">
+        <h2>Your Role</h2>
+        <div class="role-name" id="revealRoleName"></div>
+        <span class="role-team" id="revealTeam"></span>
+        <div class="known-info" id="revealKnown"></div>
+      </div>
+      <button class="btn btn-primary btn-full" id="ackBtn">I've seen my role</button>
+    </section>
+
+    <!-- TEAM PROPOSAL -->
+    <section id="teamProposal">
+      <div class="quest-board" id="tpQuestBoard"></div>
+      <div class="role-info-bar" id="tpRoleBar"></div>
+      <div class="status-bar">
+        <span>Quest <span id="tpQuestNum">1</span> &mdash; Team size: <span id="tpTeamSize">2</span></span>
+        <div class="reject-tracker" id="tpRejects"></div>
+      </div>
+      <div id="tpLeaderView" style="display:none">
+        <div class="card">
+          <h2>Select your team</h2>
+          <ul class="player-list" id="tpPlayerList"></ul>
+        </div>
+        <button class="btn btn-primary btn-full" id="proposeBtn">Propose Team</button>
+      </div>
+      <div id="tpWaitView" class="waiting" style="display:none">
+        <span id="tpLeaderName"></span> is choosing a team<span class="dots"></span>
+      </div>
+    </section>
+
+    <!-- TEAM VOTE -->
+    <section id="teamVote">
+      <div class="quest-board" id="tvQuestBoard"></div>
+      <div class="role-info-bar" id="tvRoleBar"></div>
+      <div class="card">
+        <h2>Proposed Team</h2>
+        <ul class="player-list" id="tvTeamList"></ul>
+      </div>
+      <div id="tvVoteView">
+        <div class="status-bar">
+          <span>Votes: <span id="tvVoteCount">0</span>/<span id="tvTotalPlayers">0</span></span>
+          <div class="reject-tracker" id="tvRejects"></div>
+        </div>
+        <div class="btn-group" id="tvButtons">
+          <button class="btn btn-good" onclick="castVote('approve')">Approve</button>
+          <button class="btn btn-evil" onclick="castVote('reject')">Reject</button>
+        </div>
+        <div id="tvWaiting" class="waiting" style="display:none">Waiting for votes<span class="dots"></span></div>
+      </div>
+    </section>
+
+    <!-- QUEST -->
+    <section id="quest">
+      <div class="quest-board" id="qQuestBoard"></div>
+      <div class="role-info-bar" id="qRoleBar"></div>
+      <div class="card">
+        <h2>Quest <span id="qQuestNum">1</span></h2>
+        <p style="color:var(--text-dim); font-size:0.9rem">Team: <span id="qTeamNames"></span></p>
+      </div>
+      <div id="qVoteView" style="display:none">
+        <p style="text-align:center; margin-bottom:0.5rem">Play your card</p>
+        <div class="btn-group" id="qButtons">
+          <button class="btn btn-good" onclick="questVote('success')">Success</button>
+          <button class="btn btn-evil" id="qFailBtn" onclick="questVote('fail')">Fail</button>
+        </div>
+      </div>
+      <div id="qWaiting" class="waiting" style="display:none">
+        Quest in progress: <span id="qVoteCount">0</span>/<span id="qTeamSize">0</span><span class="dots"></span>
+      </div>
+    </section>
+
+    <!-- ASSASSIN GUESS -->
+    <section id="assassin">
+      <div class="quest-board" id="aQuestBoard"></div>
+      <div id="aAssassinView" style="display:none">
+        <div class="card">
+          <h2>You are the Assassin</h2>
+          <p style="color:var(--text-dim); margin-bottom:0.75rem">Good completed 3 quests. Choose who you think is Merlin.</p>
+          <ul class="player-list" id="aPlayerList"></ul>
+        </div>
+        <button class="btn btn-evil btn-full" id="assassinBtn">Assassinate</button>
+      </div>
+      <div id="aWaiting" class="waiting" style="display:none">
+        Assassin is choosing<span class="dots"></span>
+      </div>
+    </section>
+
+    <!-- GAME OVER -->
+    <section id="gameOver">
+      <div class="winner-banner" id="goBanner"></div>
+      <div class="card">
+        <p id="goReason" style="text-align:center; color:var(--text-dim); margin-bottom:0.75rem"></p>
+        <h2>Roles</h2>
+        <div class="role-reveal-list" id="goRoles"></div>
+      </div>
+      <div class="card" id="goVoteHistory">
+        <h2>Vote History</h2>
+        <div id="goVotes"></div>
+      </div>
+      <button class="btn btn-primary btn-full" id="restartBtn" style="display:none">Play Again</button>
+    </section>
+
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
