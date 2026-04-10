@@ -188,47 +188,45 @@ function buildNarrationScript(config) {
   s.push({ en: 'Everyone, close your eyes.', zh: '所有人，请闭眼。' });
   s.push({ pause: 2000 });
 
-  // Evil players reveal (except Oberon)
-  s.push({ en: 'Minions of Mordred, open your eyes and look around to recognize each other.', zh: '莫德雷德的爪牙们，请睁眼，互相确认同伴。' });
-  s.push({ pause: 5000 });
+  // Evil reveal
   if (config.oberon) {
-    s.push({ en: 'Note that Oberon does not open eyes and is not visible to you.', zh: '注意，奥伯伦不会睁眼，你们无法看到奥伯伦。' });
-    s.push({ pause: 2000 });
+    s.push({ en: 'All evil players except Oberon, open your eyes.', zh: '除了奥伯伦以外的所有坏人，请睁眼。' });
+  } else {
+    s.push({ en: 'All evil players, open your eyes.', zh: '所有坏人，请睁眼。' });
   }
-  s.push({ en: 'Minions of Mordred, close your eyes.', zh: '莫德雷德的爪牙们，请闭眼。' });
-  s.push({ pause: 2000 });
-  s.push({ en: 'Everyone, put your thumbs out so that Merlin can see you.', zh: '所有人，请伸出拳头，竖起大拇指。' });
+  s.push({ pause: 5000 });
+  s.push({ en: 'All evil players, close your eyes.', zh: '坏人，请闭眼。' });
   s.push({ pause: 2000 });
 
   // Merlin
   if (config.merlin) {
-    s.push({ en: 'Minions of Mordred, extend your thumbs.', zh: '莫德雷德的爪牙们，请竖起大拇指。' });
+    s.push({ en: 'All evil players, raise your thumbs.', zh: '所有坏人，请竖起大拇指。' });
     s.push({ pause: 2000 });
     if (config.mordred) {
-      s.push({ en: 'But Mordred, keep your thumb hidden. Merlin cannot see Mordred.', zh: '但莫德雷德，请不要竖起大拇指。梅林无法看到莫德雷德。' });
+      s.push({ en: 'Mordred, keep your thumb hidden.', zh: '莫德雷德，请不要竖起大拇指。' });
       s.push({ pause: 2000 });
     }
-    s.push({ en: 'Merlin, open your eyes and see the agents of evil.', zh: '梅林，请睁眼，查看邪恶的爪牙们。' });
+    s.push({ en: 'Merlin, open your eyes.', zh: '梅林，请睁眼。' });
     s.push({ pause: 5000 });
     s.push({ en: 'Merlin, close your eyes.', zh: '梅林，请闭眼。' });
     s.push({ pause: 2000 });
-    s.push({ en: 'Minions of Mordred, put your thumbs down.', zh: '莫德雷德的爪牙们，请收起大拇指。' });
+    s.push({ en: 'All evil players, put your thumbs down.', zh: '坏人，请收起大拇指。' });
     s.push({ pause: 2000 });
   }
 
   // Percival
   if (config.percival) {
     if (config.merlin) {
-      s.push({ en: 'Merlin, extend your thumb.', zh: '梅林，请竖起大拇指。' });
+      s.push({ en: 'Merlin, raise your thumb.', zh: '梅林，请竖起大拇指。' });
       s.push({ pause: 2000 });
     }
     if (config.morgana) {
-      s.push({ en: 'Morgana, extend your thumb as well.', zh: '莫甘娜，也请竖起大拇指。' });
+      s.push({ en: 'Morgana, raise your thumb too.', zh: '莫甘娜，也请竖起大拇指。' });
       s.push({ pause: 2000 });
     }
-    s.push({ en: 'Percival, open your eyes and see Merlin.', zh: '派西维尔，请睁眼，查看梅林。' });
+    s.push({ en: 'Percival, open your eyes.', zh: '派西维尔，请睁眼。' });
     if (config.morgana) {
-      s.push({ en: 'One of them is Merlin, and one is Morgana. But you do not know which is which.', zh: '其中一个是梅林，一个是莫甘娜，但你无法分辨。' });
+      s.push({ en: 'One is Merlin, one is Morgana. You cannot tell which is which.', zh: '其中一个是梅林，一个是莫甘娜，你无法分辨。' });
     }
     s.push({ pause: 5000 });
     s.push({ en: 'Percival, close your eyes.', zh: '派西维尔，请闭眼。' });
@@ -244,8 +242,6 @@ function buildNarrationScript(config) {
   }
 
   // Closing
-  s.push({ en: 'Everyone, put your fists down.', zh: '所有人，请放下拳头。' });
-  s.push({ pause: 2000 });
   s.push({ en: 'Everyone, open your eyes.', zh: '所有人，请睁眼。' });
 
   return s;
