@@ -243,6 +243,10 @@ class Game {
       state.config = this.config;
     }
 
+    if (this.phase === PHASES.ROLE_REVEAL) {
+      state.enabledRoles = this.config.roles;
+    }
+
     if (this.phase === PHASES.QUEST_TRACK) {
       state.questSizeNeeded = this.config.questSizes[this.currentQuest];
       state.doubleFailNeeded = this.config.doubleFail[this.currentQuest];

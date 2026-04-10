@@ -48,6 +48,9 @@ const T = {
     selectPlayer: 'Select a player',
     host: 'Host',
     you: 'You',
+    playNarration: 'Play Narration',
+    stopNarration: 'Stop',
+    narrating: 'Narrating...',
     // Role names
     roleMerlin: 'Merlin',
     rolePercival: 'Percival',
@@ -111,6 +114,9 @@ const T = {
     selectPlayer: '请选择一个玩家',
     host: '房主',
     you: '你',
+    playNarration: '播放语音播报',
+    stopNarration: '停止',
+    narrating: '语音播报中...',
     // Role names
     roleMerlin: '梅林',
     rolePercival: '派西维尔',
@@ -136,6 +142,131 @@ const T = {
 };
 
 function t(key) { return T[lang][key] || T.en[key] || key; }
+
+// --- Narration Script (Speech Synthesis) ---
+let narrationPlaying = false;
+let narrationUtterances = [];
+let narrationCancel = false;
+
+function buildNarrationScript(config) {
+  const s = [];
+  // Opening
+  s.push({ en: 'Everyone, close your eyes.', zh: '所有人，请闭眼。' });
+  s.push({ pause: 2000 });
+
+  // Evil players reveal (except Oberon)
+  s.push({ en: 'Minions of Mordred, open your eyes and look around to recognize each other.', zh: '莫德雷德的爪牙们，请睁眼，互相确认同伴。' });
+  s.push({ pause: 5000 });
+  if (config.oberon) {
+    s.push({ en: 'Note that Oberon does not open eyes and is not visible to you.', zh: '注意，奥伯伦不会睁眼，你们无法看到奥伯伦。' });
+    s.push({ pause: 2000 });
+  }
+  s.push({ en: 'Minions of Mordred, close your eyes.', zh: '莫德雷德的爪牙们，请闭眼。' });
+  s.push({ pause: 2000 });
+  s.push({ en: 'Everyone, put your thumbs out so that Merlin can see you.', zh: '所有人，请伸出拳头，竖起大拇指。' });
+  s.push({ pause: 2000 });
+
+  // Merlin
+  if (config.merlin) {
+    s.push({ en: 'Minions of Mordred, extend your thumbs.', zh: '莫德雷德的爪牙们，请竖起大拇指。' });
+    s.push({ pause: 2000 });
+    if (config.mordred) {
+      s.push({ en: 'But Mordred, keep your thumb hidden. Merlin cannot see Mordred.', zh: '但莫德雷德，请不要竖起大拇指。梅林无法看到莫德雷德。' });
+      s.push({ pause: 2000 });
+    }
+    s.push({ en: 'Merlin, open your eyes and see the agents of evil.', zh: '梅林，请睁眼，查看邪恶的爪牙们。' });
+    s.push({ pause: 5000 });
+    s.push({ en: 'Merlin, close your eyes.', zh: '梅林，请闭眼。' });
+    s.push({ pause: 2000 });
+    s.push({ en: 'Minions of Mordred, put your thumbs down.', zh: '莫德雷德的爪牙们，请收起大拇指。' });
+    s.push({ pause: 2000 });
+  }
+
+  // Percival
+  if (config.percival) {
+    if (config.merlin) {
+      s.push({ en: 'Merlin, extend your thumb.', zh: '梅林，请竖起大拇指。' });
+      s.push({ pause: 2000 });
+    }
+    if (config.morgana) {
+      s.push({ en: 'Morgana, extend your thumb as well.', zh: '莫甘娜，也请竖起大拇指。' });
+      s.push({ pause: 2000 });
+    }
+    s.push({ en: 'Percival, open your eyes and see Merlin.', zh: '派西维尔，请睁眼，查看梅林。' });
+    if (config.morgana) {
+      s.push({ en: 'One of them is Merlin, and one is Morgana. But you do not know which is which.', zh: '其中一个是梅林，一个是莫甘娜，但你无法分辨。' });
+    }
+    s.push({ pause: 5000 });
+    s.push({ en: 'Percival, close your eyes.', zh: '派西维尔，请闭眼。' });
+    s.push({ pause: 2000 });
+    if (config.merlin) {
+      s.push({ en: 'Merlin, put your thumb down.', zh: '梅林，请收起大拇指。' });
+      s.push({ pause: 1000 });
+    }
+    if (config.morgana) {
+      s.push({ en: 'Morgana, put your thumb down.', zh: '莫甘娜，请收起大拇指。' });
+      s.push({ pause: 1000 });
+    }
+  }
+
+  // Closing
+  s.push({ en: 'Everyone, put your fists down.', zh: '所有人，请放下拳头。' });
+  s.push({ pause: 2000 });
+  s.push({ en: 'Everyone, open your eyes.', zh: '所有人，请睁眼。' });
+
+  return s;
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (narrationCancel) return resolve();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    utterance.rate = lang === 'zh' ? 0.9 : 0.85;
+    utterance.onend = resolve;
+    utterance.onerror = resolve;
+    speechSynthesis.speak(utterance);
+  });
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function playNarration(config) {
+  if (narrationPlaying) return;
+  narrationPlaying = true;
+  narrationCancel = false;
+
+  const script = buildNarrationScript(config);
+  $('narrationStatus').style.display = '';
+  $('narrationText').textContent = lang === 'zh' ? '语音播报中...' : 'Narrating...';
+  $('stopNarrationBtn').style.display = '';
+
+  for (const step of script) {
+    if (narrationCancel) break;
+    if (step.pause) {
+      await wait(step.pause);
+    } else {
+      const text = lang === 'zh' ? step.zh : step.en;
+      $('narrationText').textContent = text;
+      await speak(text);
+      await wait(500);
+    }
+  }
+
+  narrationPlaying = false;
+  $('narrationStatus').style.display = 'none';
+  $('stopNarrationBtn').style.display = 'none';
+}
+
+function stopNarration() {
+  narrationCancel = true;
+  speechSynthesis.cancel();
+  narrationPlaying = false;
+  $('narrationStatus').style.display = 'none';
+  $('stopNarrationBtn').style.display = 'none';
+}
 
 function translateRole(englishRole) {
   const map = {
@@ -387,6 +518,8 @@ function renderLobby(s) {
   }
 }
 
+let narrationAutoStarted = false;
+
 function renderRoleReveal(s) {
   show('roleReveal');
   $('revealRoleName').textContent = translateRole(s.you.role);
@@ -400,6 +533,21 @@ function renderRoleReveal(s) {
       known.map(k => `<div class="known-item">${k.name} — <em>${translateHint(k.hint)}</em></div>`).join('');
   } else {
     $('revealKnown').innerHTML = `<h3>${t('noKnowledge')}</h3>`;
+  }
+
+  // Narration controls (host only)
+  if (s.you?.isHost) {
+    $('narrationControls').style.display = '';
+    $('playNarrationBtn').textContent = t('playNarration');
+    $('playNarrationBtn').onclick = () => playNarration(s.enabledRoles);
+    $('stopNarrationBtn').textContent = t('stopNarration');
+    // Auto-start narration on first render
+    if (!narrationAutoStarted && !narrationPlaying) {
+      narrationAutoStarted = true;
+      playNarration(s.enabledRoles);
+    }
+  } else {
+    $('narrationControls').style.display = 'none';
   }
 }
 
@@ -466,6 +614,8 @@ function renderGameOver(s) {
 
   $('restartBtn').style.display = s.you?.isHost ? '' : 'none';
   assassinTarget = null;
+  narrationAutoStarted = false;
+  stopNarration();
 }
 
 // --- Init ---
