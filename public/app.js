@@ -1,0 +1,751 @@
+/* global io */
+const socket = io();
+let state = null;
+let assassinTarget = null;
+
+// --- i18n ---
+let lang = localStorage.getItem('avalon_lang') || 'en';
+
+const T = {
+  en: {
+    title: 'Avalon',
+    subtitle: 'Offline game assistant',
+    yourName: 'Your name',
+    createGame: 'Create Game',
+    gameCode: 'Game code',
+    joinGame: 'Join Game',
+    gameLobby: 'Game Lobby',
+    shareCode: 'Share this code with other players',
+    players: 'Players',
+    settings: 'Settings',
+    goodPlayers: 'Good players',
+    evilPlayers: 'Evil players',
+    merlinAssassin: 'Merlin & Assassin',
+    startGame: 'Start Game',
+    waitingHost: 'Waiting for host to start',
+    yourRole: 'Your Role',
+    seenRole: "I've seen my role",
+    youKnow: 'You know:',
+    noKnowledge: 'You have no special knowledge',
+    quest: 'Quest',
+    teamSize: 'Team size',
+    needs2Fails: '(needs 2 fails)',
+    hostInstruction: 'Discuss, vote, and quest in person. Then record the result:',
+    questSuccess: 'Quest Success',
+    questFail: 'Quest Fail',
+    playerInstruction: 'Play the game in person. Host will record results.',
+    assassinPhase: 'Assassin Phase',
+    assassinDesc: 'Good completed 3 quests! The Assassin now guesses who Merlin is. Select the target:',
+    confirmKill: 'Confirm Assassination',
+    assassinWait: 'Assassin phase in progress',
+    goodWins: 'Good Wins!',
+    evilWins: 'Evil Wins!',
+    roles: 'Roles',
+    questResults: 'Quest Results',
+    playAgain: 'Play Again',
+    enterName: 'Enter your name',
+    enterCode: 'Enter game code',
+    selectPlayer: 'Select a player',
+    host: 'Host',
+    you: 'You',
+    playNarration: 'Play Narration',
+    stopNarration: 'Stop',
+    narrating: 'Narrating...',
+    leaveRoom: 'Leave Room',
+    selectTeam: 'Select your team',
+    proposeTeam: 'Propose Team',
+    choosingTeam: 'is choosing a team',
+    rejects: 'Rejects',
+    proposedTeam: 'Proposed Team',
+    votes: 'Votes',
+    approve: 'Approve',
+    reject: 'Reject',
+    waitingVotes: 'Waiting for votes',
+    team: 'Team',
+    playCard: 'Play your card',
+    success: 'Success',
+    fail: 'Fail',
+    questInProgress: 'Quest in progress',
+    leader: 'Leader',
+    onTeam: 'On Team',
+    // Role names
+    roleMerlin: 'Merlin',
+    rolePercival: 'Percival',
+    roleAssassin: 'Assassin',
+    roleMorgana: 'Morgana',
+    roleMordred: 'Mordred',
+    roleOberon: 'Oberon',
+    roleLoyalServant: 'Loyal Servant',
+    roleMinionOfMordred: 'Minion of Mordred',
+    // Hints
+    hintEvil: 'Evil',
+    hintMerlinOrMorgana: 'Merlin or Morgana',
+    // Teams
+    teamGood: 'GOOD',
+    teamEvil: 'EVIL',
+    // Win reasons
+    reason3Failed: '3 quests failed',
+    reason3Succeeded: '3 quests succeeded',
+    reasonAssassinFound: 'Assassin found Merlin',
+    reasonAssassinFailed: 'Assassin failed to find Merlin',
+    reason5Rejects: '5 consecutive team rejections',
+  },
+  zh: {
+    title: 'Avalon',
+    subtitle: '线下游戏助手',
+    yourName: '你的名字',
+    createGame: '创建游戏',
+    gameCode: '房间号',
+    joinGame: '加入游戏',
+    gameLobby: '游戏大厅',
+    shareCode: '将房间号分享给其他玩家',
+    players: '玩家',
+    settings: '设置',
+    goodPlayers: '好人数量',
+    evilPlayers: '坏人数量',
+    merlinAssassin: '梅林 & 刺客',
+    startGame: '开始游戏',
+    waitingHost: '等待房主开始游戏',
+    yourRole: '你的角色',
+    seenRole: '我已查看角色',
+    youKnow: '你知道的信息：',
+    noKnowledge: '你没有特殊情报',
+    quest: '任务',
+    teamSize: '队伍人数',
+    needs2Fails: '（需要2张失败牌）',
+    hostInstruction: '请面对面讨论、投票、执行任务，然后记录结果：',
+    questSuccess: '任务成功',
+    questFail: '任务失败',
+    playerInstruction: '请面对面进行游戏，房主会记录结果。',
+    assassinPhase: '刺客阶段',
+    assassinDesc: '好人完成了3个任务！刺客现在猜测谁是梅林，请选择目标：',
+    confirmKill: '确认刺杀',
+    assassinWait: '刺客阶段进行中',
+    goodWins: '好人获胜！',
+    evilWins: '坏人获胜！',
+    roles: '角色揭晓',
+    questResults: '任务结果',
+    playAgain: '再来一局',
+    enterName: '请输入名字',
+    enterCode: '请输入房间号',
+    selectPlayer: '请选择一个玩家',
+    host: '房主',
+    you: '你',
+    playNarration: '播放语音播报',
+    stopNarration: '停止',
+    narrating: '语音播报中...',
+    leaveRoom: '退出房间',
+    selectTeam: '选择队伍',
+    proposeTeam: '确认出队',
+    choosingTeam: '正在选择队伍',
+    rejects: '否决次数',
+    proposedTeam: '提议的队伍',
+    votes: '投票',
+    approve: '同意',
+    reject: '反对',
+    waitingVotes: '等待投票中',
+    team: '队伍',
+    playCard: '请出牌',
+    success: '成功',
+    fail: '失败',
+    questInProgress: '任务进行中',
+    leader: '车头',
+    onTeam: '上车',
+    // Role names
+    roleMerlin: '梅林',
+    rolePercival: '派西维尔',
+    roleAssassin: '刺客',
+    roleMorgana: '莫甘娜',
+    roleMordred: '莫德雷德',
+    roleOberon: '奥伯伦',
+    roleLoyalServant: '忠臣',
+    roleMinionOfMordred: '爪牙',
+    // Hints
+    hintEvil: '坏人',
+    hintMerlinOrMorgana: '梅林或莫甘娜',
+    // Teams
+    teamGood: '好人',
+    teamEvil: '坏人',
+    // Win reasons
+    reason3Failed: '3个任务失败',
+    reason3Succeeded: '3个任务成功',
+    reasonAssassinFound: '刺客找到了梅林',
+    reasonAssassinFailed: '刺客没有找到梅林',
+    reason5Rejects: '连续5次否决队伍',
+  }
+};
+
+function t(key) { return T[lang][key] || T.en[key] || key; }
+
+// --- Narration Script (Speech Synthesis) ---
+let narrationPlaying = false;
+let narrationUtterances = [];
+let narrationCancel = false;
+
+function buildNarrationScript(config) {
+  const s = [];
+  // Opening
+  s.push({ en: 'Everyone, close your eyes.', zh: '所有人，请闭眼。' });
+  s.push({ pause: 2000 });
+
+  // Evil players reveal (except Oberon)
+  s.push({ en: 'Minions of Mordred, open your eyes and look around to recognize each other.', zh: '莫德雷德的爪牙们，请睁眼，互相确认同伴。' });
+  s.push({ pause: 5000 });
+  if (config.oberon) {
+    s.push({ en: 'Note that Oberon does not open eyes and is not visible to you.', zh: '注意，奥伯伦不会睁眼，你们无法看到奥伯伦。' });
+    s.push({ pause: 2000 });
+  }
+  s.push({ en: 'Minions of Mordred, close your eyes.', zh: '莫德雷德的爪牙们，请闭眼。' });
+  s.push({ pause: 2000 });
+  s.push({ en: 'Everyone, put your thumbs out so that Merlin can see you.', zh: '所有人，请伸出拳头，竖起大拇指。' });
+  s.push({ pause: 2000 });
+
+  // Merlin
+  if (config.merlin) {
+    s.push({ en: 'Minions of Mordred, extend your thumbs.', zh: '莫德雷德的爪牙们，请竖起大拇指。' });
+    s.push({ pause: 2000 });
+    if (config.mordred) {
+      s.push({ en: 'But Mordred, keep your thumb hidden. Merlin cannot see Mordred.', zh: '但莫德雷德，请不要竖起大拇指。梅林无法看到莫德雷德。' });
+      s.push({ pause: 2000 });
+    }
+    s.push({ en: 'Merlin, open your eyes and see the agents of evil.', zh: '梅林，请睁眼，查看邪恶的爪牙们。' });
+    s.push({ pause: 5000 });
+    s.push({ en: 'Merlin, close your eyes.', zh: '梅林，请闭眼。' });
+    s.push({ pause: 2000 });
+    s.push({ en: 'Minions of Mordred, put your thumbs down.', zh: '莫德雷德的爪牙们，请收起大拇指。' });
+    s.push({ pause: 2000 });
+  }
+
+  // Percival
+  if (config.percival) {
+    if (config.merlin) {
+      s.push({ en: 'Merlin, extend your thumb.', zh: '梅林，请竖起大拇指。' });
+      s.push({ pause: 2000 });
+    }
+    if (config.morgana) {
+      s.push({ en: 'Morgana, extend your thumb as well.', zh: '莫甘娜，也请竖起大拇指。' });
+      s.push({ pause: 2000 });
+    }
+    s.push({ en: 'Percival, open your eyes and see Merlin.', zh: '派西维尔，请睁眼，查看梅林。' });
+    if (config.morgana) {
+      s.push({ en: 'One of them is Merlin, and one is Morgana. But you do not know which is which.', zh: '其中一个是梅林，一个是莫甘娜，但你无法分辨。' });
+    }
+    s.push({ pause: 5000 });
+    s.push({ en: 'Percival, close your eyes.', zh: '派西维尔，请闭眼。' });
+    s.push({ pause: 2000 });
+    if (config.merlin) {
+      s.push({ en: 'Merlin, put your thumb down.', zh: '梅林，请收起大拇指。' });
+      s.push({ pause: 1000 });
+    }
+    if (config.morgana) {
+      s.push({ en: 'Morgana, put your thumb down.', zh: '莫甘娜，请收起大拇指。' });
+      s.push({ pause: 1000 });
+    }
+  }
+
+  // Closing
+  s.push({ en: 'Everyone, put your fists down.', zh: '所有人，请放下拳头。' });
+  s.push({ pause: 2000 });
+  s.push({ en: 'Everyone, open your eyes.', zh: '所有人，请睁眼。' });
+
+  return s;
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (narrationCancel) return resolve();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    utterance.rate = lang === 'zh' ? 0.9 : 0.85;
+    utterance.onend = resolve;
+    utterance.onerror = resolve;
+    speechSynthesis.speak(utterance);
+  });
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function playNarration(config) {
+  if (narrationPlaying) return;
+  narrationPlaying = true;
+  narrationCancel = false;
+
+  const script = buildNarrationScript(config);
+  $('narrationStatus').style.display = '';
+  $('narrationText').textContent = lang === 'zh' ? '语音播报中...' : 'Narrating...';
+  $('stopNarrationBtn').style.display = '';
+
+  for (const step of script) {
+    if (narrationCancel) break;
+    if (step.pause) {
+      await wait(step.pause);
+    } else {
+      const text = lang === 'zh' ? step.zh : step.en;
+      $('narrationText').textContent = text;
+      await speak(text);
+      await wait(500);
+    }
+  }
+
+  narrationPlaying = false;
+  $('narrationStatus').style.display = 'none';
+  $('stopNarrationBtn').style.display = 'none';
+}
+
+function stopNarration() {
+  narrationCancel = true;
+  speechSynthesis.cancel();
+  narrationPlaying = false;
+  $('narrationStatus').style.display = 'none';
+  $('stopNarrationBtn').style.display = 'none';
+}
+
+function translateRole(englishRole) {
+  const map = {
+    'Merlin': t('roleMerlin'),
+    'Percival': t('rolePercival'),
+    'Assassin': t('roleAssassin'),
+    'Morgana': t('roleMorgana'),
+    'Mordred': t('roleMordred'),
+    'Oberon': t('roleOberon'),
+    'Loyal Servant': t('roleLoyalServant'),
+    'Minion of Mordred': t('roleMinionOfMordred'),
+  };
+  return map[englishRole] || englishRole;
+}
+
+function translateTeam(team) {
+  return team === 'GOOD' ? t('teamGood') : t('teamEvil');
+}
+
+function translateHint(hint) {
+  const map = {
+    'Evil': t('hintEvil'),
+    'Merlin or Morgana': t('hintMerlinOrMorgana'),
+  };
+  return map[hint] || hint;
+}
+
+function translateWinReason(reason) {
+  const map = {
+    '3 quests failed': t('reason3Failed'),
+    '3 quests succeeded': t('reason3Succeeded'),
+    'Assassin found Merlin': t('reasonAssassinFound'),
+    'Assassin failed to find Merlin': t('reasonAssassinFailed'),
+    '5 consecutive team rejections': t('reason5Rejects'),
+  };
+  return map[reason] || reason;
+}
+
+function toggleLang() {
+  lang = lang === 'en' ? 'zh' : 'en';
+  localStorage.setItem('avalon_lang', lang);
+  $('langBtn').textContent = lang === 'en' ? '中文' : 'EN';
+  applyStaticText();
+  if (state) render(state);
+}
+
+function applyStaticText() {
+  // Home
+  $('homeTitle').textContent = t('title');
+  $('homeSubtitle').textContent = t('subtitle');
+  $('playerName').placeholder = t('yourName');
+  $('createBtn').textContent = t('createGame');
+  $('joinCode').placeholder = t('gameCode');
+  $('joinBtn').textContent = t('joinGame');
+  // Lobby
+  $('lobbyTitle').textContent = t('gameLobby');
+  $('lobbyShareText').textContent = t('shareCode');
+  $('settingsTitle').textContent = t('settings');
+  $('labelGood').textContent = t('goodPlayers');
+  $('labelEvil').textContent = t('evilPlayers');
+  $('labelMerlin').textContent = t('merlinAssassin');
+  $('labelPercival').textContent = 'Percival / ' + t('rolePercival');
+  $('labelMorgana').textContent = 'Morgana / ' + t('roleMorgana');
+  $('labelMordred').textContent = 'Mordred / ' + t('roleMordred');
+  $('labelOberon').textContent = 'Oberon / ' + t('roleOberon');
+  $('startBtn').textContent = t('startGame');
+  $('leaveBtn').textContent = lang === 'zh' ? '退出房间' : 'Leave Room';
+  // Role reveal
+  $('revealTitle').textContent = t('yourRole');
+  $('ackBtn').textContent = t('seenRole');
+  // Assassin
+  $('assassinTitle').textContent = t('assassinPhase');
+  $('assassinDesc').textContent = t('assassinDesc');
+  $('assassinBtn').textContent = t('confirmKill');
+  // Game over
+  $('goRolesTitle').textContent = t('roles');
+  $('goQuestTitle').textContent = t('questResults');
+  $('restartBtn').textContent = t('playAgain');
+}
+
+// --- Helpers ---
+function $(id) { return document.getElementById(id); }
+function show(id) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  $('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function emit(event, data, cb) {
+  socket.emit(event, data, (res) => {
+    if (res?.error) toast(res.error);
+    else if (cb) cb(res);
+  });
+}
+
+// --- Auto-reconnect ---
+const saved = {
+  get gameId() { return sessionStorage.getItem('avalon_gameId'); },
+  set gameId(v) { sessionStorage.setItem('avalon_gameId', v); },
+  get name() { return sessionStorage.getItem('avalon_name'); },
+  set name(v) { sessionStorage.setItem('avalon_name', v); },
+};
+
+socket.on('connect', () => {
+  if (saved.gameId && saved.name) {
+    emit('join-game', { gameId: saved.gameId, playerName: saved.name });
+  }
+});
+
+// --- Create / Join ---
+$('createBtn').onclick = () => {
+  const name = $('playerName').value.trim();
+  if (!name) return toast(t('enterName'));
+  saved.name = name;
+  emit('create-game', { playerName: name }, (res) => {
+    saved.gameId = res.gameId;
+  });
+};
+
+$('joinBtn').onclick = () => {
+  const name = $('playerName').value.trim();
+  const code = $('joinCode').value.trim().toUpperCase();
+  if (!name) return toast(t('enterName'));
+  if (!code) return toast(t('enterCode'));
+  saved.name = name;
+  emit('join-game', { gameId: code, playerName: name }, () => {
+    saved.gameId = code;
+  });
+};
+
+// --- Config (host) ---
+function adjustCount(type, delta) {
+  if (!state) return;
+  const cfg = state.config;
+  let good = cfg.goodCount ?? state.players.length - 2;
+  let evil = cfg.evilCount ?? 2;
+
+  if (type === 'good') good = Math.max(1, good + delta);
+  else evil = Math.max(1, evil + delta);
+
+  emit('configure-game', { goodCount: good, evilCount: evil });
+}
+
+function updateConfig() {
+  emit('configure-game', {
+    roles: {
+      merlin: $('roleMerlin').checked,
+      percival: $('rolePercival').checked,
+      morgana: $('roleMorgana').checked,
+      mordred: $('roleMordred').checked,
+      oberon: $('roleOberon').checked,
+    }
+  });
+}
+
+$('startBtn').onclick = () => emit('start-game', {});
+$('ackBtn').onclick = () => emit('acknowledge-role', {});
+$('restartBtn').onclick = () => emit('restart-game', {});
+
+// --- Leave Game ---
+function leaveGame() {
+  emit('leave-game', {}, () => {
+    saved.gameId = '';
+    saved.name = '';
+    state = null;
+    selectedTeam = new Set();
+    assassinTarget = null;
+    show('home');
+  });
+}
+
+// --- Team Proposal ---
+let selectedTeam = new Set();
+
+$('proposeBtn').onclick = () => {
+  emit('propose-team', { team: Array.from(selectedTeam) });
+};
+
+function togglePlayer(id) {
+  if (selectedTeam.has(id)) selectedTeam.delete(id);
+  else selectedTeam.add(id);
+  render(state);
+}
+
+// --- Voting ---
+function castVote(vote) {
+  emit('cast-vote', { vote });
+}
+
+function questVote(vote) {
+  emit('quest-vote', { vote });
+}
+
+// --- Assassin Guess ---
+$('assassinBtn').onclick = () => {
+  if (!assassinTarget) return toast(t('selectPlayer'));
+  emit('assassin-guess', { targetId: assassinTarget });
+};
+
+function selectAssassinTarget(id) {
+  assassinTarget = id;
+  render(state);
+}
+
+// --- Quest Board Renderer ---
+function renderQuestBoard(containerId, st) {
+  const el = $(containerId);
+  if (!st.questSizes) { el.innerHTML = ''; return; }
+  el.innerHTML = st.questSizes.map((size, i) => {
+    let cls = 'quest-slot';
+    if (i === st.currentQuest && st.phase !== 'GAME_OVER') cls += ' current';
+    const result = st.questResults[i];
+    if (result) cls += result.result === 'success' ? ' success' : ' fail';
+    const df = st.doubleFail[i] ? '<div class="df">2F</div>' : '';
+    return `<div class="${cls}"><span>${size}</span>${df}</div>`;
+  }).join('');
+}
+
+// --- Role Info Bar ---
+function renderRoleBar(containerId, st) {
+  const el = $(containerId);
+  if (!st.you?.role) { el.innerHTML = ''; return; }
+  const teamClass = st.you.team === 'GOOD' ? 'team-good' : 'team-evil';
+  const roleName = translateRole(st.you.role);
+  const teamName = translateTeam(st.you.team);
+  el.innerHTML = `<span>${t('you')}: <strong>${roleName}</strong></span><span class="role-team ${teamClass}" style="font-size:0.75rem; padding:0.15rem 0.5rem">${teamName}</span>`;
+}
+
+// --- Main Render ---
+socket.on('game-state', (s) => {
+  state = s;
+  render(s);
+});
+
+function render(s) {
+  switch (s.phase) {
+    case 'LOBBY': renderLobby(s); break;
+    case 'ROLE_REVEAL': renderRoleReveal(s); break;
+    case 'TEAM_PROPOSAL': renderTeamProposal(s); break;
+    case 'TEAM_VOTE': renderTeamVote(s); break;
+    case 'QUEST': renderQuest(s); break;
+    case 'ASSASSIN_GUESS': renderAssassin(s); break;
+    case 'GAME_OVER': renderGameOver(s); break;
+  }
+}
+
+function renderLobby(s) {
+  show('lobby');
+  $('lobbyCode').textContent = s.gameId;
+  $('playerCount').textContent = s.players.length;
+  $('lobbyPlayersLabel').textContent = t('players');
+  $('lobbyPlayers').innerHTML = s.players.map(p => {
+    const badges = [];
+    if (p.isHost) badges.push(`<span class="badge badge-host">${t('host')}</span>`);
+    if (p.id === s.you?.id) badges.push(`<span class="badge badge-you">${t('you')}</span>`);
+    return `<li class="player-item"><span>${p.name}</span><span>${badges.join(' ')}</span></li>`;
+  }).join('');
+
+  if (s.you?.isHost) {
+    $('configPanel').style.display = '';
+    $('waitingHost').style.display = 'none';
+    const cfg = s.config;
+    $('goodCount').textContent = cfg.goodCount ?? '?';
+    $('evilCount').textContent = cfg.evilCount ?? '?';
+    $('roleMerlin').checked = cfg.roles.merlin;
+    $('rolePercival').checked = cfg.roles.percival;
+    $('roleMorgana').checked = cfg.roles.morgana;
+    $('roleMordred').checked = cfg.roles.mordred;
+    $('roleOberon').checked = cfg.roles.oberon;
+  } else {
+    $('configPanel').style.display = 'none';
+    $('waitingHost').style.display = '';
+    $('waitingHostText').textContent = t('waitingHost');
+  }
+}
+
+let narrationAutoStarted = false;
+
+function renderRoleReveal(s) {
+  show('roleReveal');
+  $('revealRoleName').textContent = translateRole(s.you.role);
+  const isGood = s.you.team === 'GOOD';
+  $('revealTeam').textContent = translateTeam(s.you.team);
+  $('revealTeam').className = 'role-team ' + (isGood ? 'team-good' : 'team-evil');
+
+  const known = s.you.knownInfo || [];
+  if (known.length > 0) {
+    $('revealKnown').innerHTML = `<h3>${t('youKnow')}</h3>` +
+      known.map(k => `<div class="known-item">${k.name} — <em>${translateHint(k.hint)}</em></div>`).join('');
+  } else {
+    $('revealKnown').innerHTML = `<h3>${t('noKnowledge')}</h3>`;
+  }
+
+  if (s.you?.isHost) {
+    $('narrationControls').style.display = '';
+    $('playNarrationBtn').textContent = t('playNarration');
+    $('playNarrationBtn').onclick = () => playNarration(s.enabledRoles);
+    $('stopNarrationBtn').textContent = t('stopNarration');
+    if (!narrationAutoStarted && !narrationPlaying) {
+      narrationAutoStarted = true;
+      playNarration(s.enabledRoles);
+    }
+  } else {
+    $('narrationControls').style.display = 'none';
+  }
+}
+
+function renderTeamProposal(s) {
+  show('teamProposal');
+  renderQuestBoard('tpQuestBoard', s);
+  renderRoleBar('tpRoleBar', s);
+  $('tpQuestLabel').textContent = t('quest');
+  $('tpQuestNum').textContent = s.currentQuest + 1;
+  $('tpTeamSizeLabel').textContent = t('teamSize');
+  $('tpTeamSize').textContent = s.requiredTeamSize;
+  $('tpRejectLabel').textContent = t('rejects');
+  $('tpRejects').textContent = s.consecutiveRejects;
+
+  const leader = s.players.find(p => p.isLeader);
+
+  if (s.you?.isLeader) {
+    $('tpLeaderView').style.display = '';
+    $('tpWaitView').style.display = 'none';
+    $('tpSelectLabel').textContent = t('selectTeam');
+
+    selectedTeam = new Set([...selectedTeam].filter(id => s.players.some(p => p.id === id)));
+
+    $('tpPlayerList').innerHTML = s.players.map(p => {
+      const sel = selectedTeam.has(p.id) ? ' selected' : '';
+      const you = p.id === s.you.id ? ` <span class="badge badge-you">${t('you')}</span>` : '';
+      return `<li class="player-item${sel}" onclick="togglePlayer('${p.id}')"><span>${p.name}${you}</span></li>`;
+    }).join('');
+
+    $('proposeBtn').disabled = selectedTeam.size !== s.requiredTeamSize;
+    $('proposeBtn').textContent = `${t('proposeTeam')} (${selectedTeam.size}/${s.requiredTeamSize})`;
+  } else {
+    $('tpLeaderView').style.display = 'none';
+    $('tpWaitView').style.display = '';
+    $('tpLeaderName').textContent = leader ? leader.name : '?';
+    $('tpChoosingText').textContent = t('choosingTeam');
+  }
+}
+
+function renderTeamVote(s) {
+  show('teamVote');
+  renderQuestBoard('tvQuestBoard', s);
+  renderRoleBar('tvRoleBar', s);
+  $('tvProposedLabel').textContent = t('proposedTeam');
+
+  $('tvTeamList').innerHTML = s.teamProposal.map(p =>
+    `<li class="player-item"><span>${p.name}</span><span class="badge badge-team">${t('onTeam')}</span></li>`
+  ).join('');
+
+  $('tvVotesLabel').textContent = t('votes');
+  $('tvVoteCount').textContent = s.votesSubmitted;
+  $('tvTotalPlayers').textContent = s.players.length;
+  $('tvApproveBtn').textContent = t('approve');
+  $('tvRejectBtn').textContent = t('reject');
+
+  if (s.youVoted) {
+    $('tvButtons').style.display = 'none';
+    $('tvWaiting').style.display = '';
+    $('tvWaitText').textContent = t('waitingVotes');
+  } else {
+    $('tvButtons').style.display = '';
+    $('tvWaiting').style.display = 'none';
+  }
+}
+
+function renderQuest(s) {
+  show('quest');
+  renderQuestBoard('qQuestBoard', s);
+  renderRoleBar('qRoleBar', s);
+  $('qQuestLabel').textContent = t('quest');
+  $('qQuestNum').textContent = s.currentQuest + 1;
+  $('qTeamLabel').textContent = t('team');
+  $('qTeamNames').textContent = s.teamProposal.map(p => p.name).join(', ');
+  $('qVoteCount').textContent = s.questVotesSubmitted;
+  $('qTeamSize').textContent = s.teamProposal.length;
+  $('qSuccessBtn').textContent = t('success');
+  $('qFailBtn').textContent = t('fail');
+  $('qPlayCardText').textContent = t('playCard');
+  $('qWaitText').textContent = t('questInProgress');
+
+  const isOnTeam = s.you?.isOnTeam;
+  if (isOnTeam && !s.youVoted) {
+    $('qVoteView').style.display = '';
+    $('qWaiting').style.display = 'none';
+    $('qFailBtn').style.display = s.you.team === 'GOOD' ? 'none' : '';
+  } else {
+    $('qVoteView').style.display = 'none';
+    $('qWaiting').style.display = '';
+  }
+}
+
+function renderAssassin(s) {
+  show('assassin');
+  renderQuestBoard('aQuestBoard', s);
+
+  if (s.you?.isHost) {
+    $('aHostView').style.display = '';
+    $('aPlayerWait').style.display = 'none';
+
+    $('aPlayerList').innerHTML = s.players.map(p => {
+      const sel = assassinTarget === p.id ? ' selected' : '';
+      return `<li class="player-item${sel}" onclick="selectAssassinTarget('${p.id}')"><span>${p.name}</span></li>`;
+    }).join('');
+
+    $('assassinBtn').disabled = !assassinTarget;
+  } else {
+    $('aHostView').style.display = 'none';
+    $('aPlayerWait').style.display = '';
+    $('aPlayerWaitText').textContent = t('assassinWait');
+  }
+}
+
+function renderGameOver(s) {
+  show('gameOver');
+  const goodWon = s.winner === 'GOOD';
+  $('goBanner').textContent = goodWon ? t('goodWins') : t('evilWins');
+  $('goBanner').className = 'winner-banner ' + (goodWon ? 'good-wins' : 'evil-wins');
+  $('goReason').textContent = translateWinReason(s.winReason);
+
+  renderQuestBoard('goQuestBoard', s);
+
+  $('goRoles').innerHTML = (s.revealedRoles || []).map(p =>
+    `<div class="role-reveal-item">
+      <span>${p.name} — ${translateRole(p.role)}</span>
+      <span class="team-tag ${p.team.toLowerCase()}">${translateTeam(p.team)}</span>
+    </div>`
+  ).join('');
+
+  $('restartBtn').style.display = s.you?.isHost ? '' : 'none';
+  assassinTarget = null;
+  selectedTeam = new Set();
+  narrationAutoStarted = false;
+  stopNarration();
+}
+
+// --- Init ---
+$('langBtn').textContent = lang === 'en' ? '中文' : 'EN';
+applyStaticText();
