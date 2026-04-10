@@ -7,12 +7,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <button class="lang-toggle" id="langBtn" onclick="toggleLang()">中文</button>
+
   <div class="container">
 
     <!-- HOME -->
     <section id="home" class="active">
-      <h1>Avalon</h1>
-      <p style="color:var(--text-dim); text-align:center; margin-bottom:0.5rem">Offline game assistant</p>
+      <h1 id="homeTitle">Avalon</h1>
+      <p id="homeSubtitle" style="color:var(--text-dim); text-align:center; margin-bottom:0.5rem">Offline game assistant</p>
       <div class="card">
         <input type="text" id="playerName" placeholder="Your name" maxlength="20" autocomplete="off">
       </div>
@@ -25,19 +27,19 @@
 
     <!-- LOBBY -->
     <section id="lobby">
-      <h1>Game Lobby</h1>
+      <h1 id="lobbyTitle">Game Lobby</h1>
       <div class="game-code" id="lobbyCode"></div>
-      <p style="color:var(--text-dim); text-align:center; font-size:0.85rem">Share this code with other players</p>
+      <p id="lobbyShareText" style="color:var(--text-dim); text-align:center; font-size:0.85rem">Share this code with other players</p>
       <div class="card">
-        <h2>Players (<span id="playerCount">0</span>)</h2>
+        <h2><span id="lobbyPlayersLabel">Players</span> (<span id="playerCount">0</span>)</h2>
         <ul class="player-list" id="lobbyPlayers"></ul>
       </div>
 
       <!-- Config (host only) -->
       <div class="card" id="configPanel" style="display:none">
-        <h2>Settings</h2>
+        <h2 id="settingsTitle">Settings</h2>
         <div class="config-row">
-          <label>Good players</label>
+          <label id="labelGood">Good players</label>
           <div class="count-control">
             <button class="btn" onclick="adjustCount('good',-1)">-</button>
             <span class="count-value" id="goodCount">-</span>
@@ -45,7 +47,7 @@
           </div>
         </div>
         <div class="config-row">
-          <label>Evil players</label>
+          <label id="labelEvil">Evil players</label>
           <div class="count-control">
             <button class="btn" onclick="adjustCount('evil',-1)">-</button>
             <span class="count-value" id="evilCount">-</span>
@@ -54,34 +56,34 @@
         </div>
         <hr style="border-color:var(--card); margin:0.5rem 0">
         <div class="config-row">
-          <label>Merlin & Assassin</label>
+          <label id="labelMerlin">Merlin & Assassin</label>
           <label class="toggle"><input type="checkbox" id="roleMerlin" checked onchange="updateConfig()"><span class="slider"></span></label>
         </div>
         <div class="config-row">
-          <label>Percival</label>
+          <label id="labelPercival">Percival</label>
           <label class="toggle"><input type="checkbox" id="rolePercival" checked onchange="updateConfig()"><span class="slider"></span></label>
         </div>
         <div class="config-row">
-          <label>Morgana</label>
+          <label id="labelMorgana">Morgana</label>
           <label class="toggle"><input type="checkbox" id="roleMorgana" checked onchange="updateConfig()"><span class="slider"></span></label>
         </div>
         <div class="config-row">
-          <label>Mordred</label>
+          <label id="labelMordred">Mordred</label>
           <label class="toggle"><input type="checkbox" id="roleMordred" onchange="updateConfig()"><span class="slider"></span></label>
         </div>
         <div class="config-row">
-          <label>Oberon</label>
+          <label id="labelOberon">Oberon</label>
           <label class="toggle"><input type="checkbox" id="roleOberon" onchange="updateConfig()"><span class="slider"></span></label>
         </div>
         <button class="btn btn-primary btn-full" id="startBtn" style="margin-top:0.75rem">Start Game</button>
       </div>
-      <div id="waitingHost" class="waiting" style="display:none">Waiting for host to start<span class="dots"></span></div>
+      <div id="waitingHost" class="waiting" style="display:none"><span id="waitingHostText">Waiting for host to start</span><span class="dots"></span></div>
     </section>
 
     <!-- ROLE REVEAL -->
     <section id="roleReveal">
       <div class="card role-card">
-        <h2>Your Role</h2>
+        <h2 id="revealTitle">Your Role</h2>
         <div class="role-name" id="revealRoleName"></div>
         <span class="role-team" id="revealTeam"></span>
         <div class="known-info" id="revealKnown"></div>
@@ -95,27 +97,27 @@
       <div class="role-info-bar" id="qtRoleBar"></div>
 
       <div class="card">
-        <h2>Quest <span id="qtQuestNum">1</span></h2>
+        <h2><span id="qtQuestLabel">Quest</span> <span id="qtQuestNum">1</span></h2>
         <p style="color:var(--text-dim); font-size:0.9rem">
-          Team size: <strong id="qtTeamSize">2</strong>
+          <span id="qtTeamSizeLabel">Team size: </span><strong id="qtTeamSize">2</strong>
           <span id="qtDoubleFail" style="display:none"> (needs 2 fails)</span>
         </p>
       </div>
 
       <!-- Host controls -->
       <div id="qtHostView" style="display:none">
-        <p style="text-align:center; color:var(--text-dim); font-size:0.85rem; margin-bottom:0.5rem">
+        <p id="qtHostInstruction" style="text-align:center; color:var(--text-dim); font-size:0.85rem; margin-bottom:0.5rem">
           Discuss, vote, and quest in person. Then record the result:
         </p>
         <div class="btn-group">
-          <button class="btn btn-good" onclick="recordQuest('success')">Quest Success</button>
-          <button class="btn btn-evil" onclick="recordQuest('fail')">Quest Fail</button>
+          <button class="btn btn-good" id="qtSuccessBtn" onclick="recordQuest('success')">Quest Success</button>
+          <button class="btn btn-evil" id="qtFailBtn" onclick="recordQuest('fail')">Quest Fail</button>
         </div>
       </div>
 
       <!-- Non-host view -->
       <div id="qtPlayerView" class="waiting" style="display:none">
-        Play the game in person. Host will record results.<span class="dots"></span>
+        <span id="qtPlayerText">Play the game in person. Host will record results.</span><span class="dots"></span>
       </div>
     </section>
 
@@ -125,15 +127,15 @@
 
       <div id="aHostView" style="display:none">
         <div class="card">
-          <h2>Assassin Phase</h2>
-          <p style="color:var(--text-dim); margin-bottom:0.75rem">Good completed 3 quests! The Assassin now guesses who Merlin is. Select the target:</p>
+          <h2 id="assassinTitle">Assassin Phase</h2>
+          <p id="assassinDesc" style="color:var(--text-dim); margin-bottom:0.75rem">Good completed 3 quests! The Assassin now guesses who Merlin is. Select the target:</p>
           <ul class="player-list" id="aPlayerList"></ul>
         </div>
         <button class="btn btn-evil btn-full" id="assassinBtn">Confirm Assassination</button>
       </div>
 
       <div id="aPlayerWait" class="waiting" style="display:none">
-        Assassin phase in progress<span class="dots"></span>
+        <span id="aPlayerWaitText">Assassin phase in progress</span><span class="dots"></span>
       </div>
     </section>
 
@@ -142,11 +144,11 @@
       <div class="winner-banner" id="goBanner"></div>
       <div class="card">
         <p id="goReason" style="text-align:center; color:var(--text-dim); margin-bottom:0.75rem"></p>
-        <h2>Roles</h2>
+        <h2 id="goRolesTitle">Roles</h2>
         <div class="role-reveal-list" id="goRoles"></div>
       </div>
       <div class="card">
-        <h2>Quest Results</h2>
+        <h2 id="goQuestTitle">Quest Results</h2>
         <div class="quest-board" id="goQuestBoard"></div>
       </div>
       <button class="btn btn-primary btn-full" id="restartBtn" style="display:none">Play Again</button>
@@ -157,6 +159,6 @@
   <div id="toastContainer"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
