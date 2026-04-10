@@ -4,7 +4,9 @@ const { ROLES, assignRoles, getKnownInfo } = require('./roles');
 const PHASES = {
   LOBBY: 'LOBBY',
   ROLE_REVEAL: 'ROLE_REVEAL',
-  QUEST_TRACK: 'QUEST_TRACK',
+  TEAM_PROPOSAL: 'TEAM_PROPOSAL',
+  TEAM_VOTE: 'TEAM_VOTE',
+  QUEST: 'QUEST',
   ASSASSIN_GUESS: 'ASSASSIN_GUESS',
   GAME_OVER: 'GAME_OVER',
 };
@@ -17,7 +19,6 @@ class Game {
 
     this.players = [{ id: hostId, name: hostName, role: null, team: null, connected: true }];
 
-    // Config (set by host in lobby, defaults applied on start)
     this.config = {
       roles: { merlin: true, percival: true, morgana: true, mordred: false, oberon: false },
       goodCount: null,
@@ -26,9 +27,14 @@ class Game {
       doubleFail: null,
     };
 
-    // Game state
+    this.currentLeaderIdx = 0;
     this.currentQuest = 0;
     this.questResults = [];
+    this.teamProposal = [];
+    this.votes = {};
+    this.questVotes = {};
+    this.consecutiveRejects = 0;
+    this.voteHistory = [];
     this.acknowledgedPlayers = new Set();
     this.winner = null;
     this.winReason = null;
@@ -39,7 +45,6 @@ class Game {
 
   addPlayer(id, name) {
     if (this.phase !== PHASES.LOBBY) {
-      // Allow reconnection during game
       const existing = this.players.find(p => p.name === name);
       if (existing) {
         existing.id = id;
@@ -111,6 +116,7 @@ class Game {
     }
 
     assignRoles(this.players, this.config.goodCount, this.config.evilCount, this.config.roles);
+    this.currentLeaderIdx = Math.floor(Math.random() * count);
 
     this.phase = PHASES.ROLE_REVEAL;
     this.acknowledgedPlayers = new Set();
@@ -123,44 +129,148 @@ class Game {
     if (this.phase !== PHASES.ROLE_REVEAL) return;
     this.acknowledgedPlayers.add(playerId);
     if (this.acknowledgedPlayers.size === this.players.length) {
-      this.phase = PHASES.QUEST_TRACK;
+      this._startTeamProposal();
     }
   }
 
-  // --- Phase: QUEST_TRACK ---
-  // Host records quest results as they happen offline
+  // --- Phase: TEAM_PROPOSAL ---
 
-  recordQuestResult(result) {
-    if (this.phase !== PHASES.QUEST_TRACK) return { error: 'Not in quest tracking phase' };
-    if (result !== 'success' && result !== 'fail') return { error: 'Invalid result' };
+  _startTeamProposal() {
+    this.phase = PHASES.TEAM_PROPOSAL;
+    this.teamProposal = [];
+    this.votes = {};
+    this.questVotes = {};
+  }
 
-    this.questResults.push(result);
-    this.currentQuest++;
+  proposeTeam(leaderId, team) {
+    if (this.phase !== PHASES.TEAM_PROPOSAL) return { error: 'Not in team proposal phase' };
+    if (this.players[this.currentLeaderIdx].id !== leaderId) return { error: 'You are not the leader' };
 
-    const successes = this.questResults.filter(r => r === 'success').length;
-    const failures = this.questResults.filter(r => r === 'fail').length;
+    const requiredSize = this.config.questSizes[this.currentQuest];
+    if (team.length !== requiredSize) {
+      return { error: `Team must have exactly ${requiredSize} members` };
+    }
+
+    for (const pid of team) {
+      if (!this.players.find(p => p.id === pid)) {
+        return { error: 'Invalid player on team' };
+      }
+    }
+
+    this.teamProposal = team;
+    this.votes = {};
+    this.phase = PHASES.TEAM_VOTE;
+    return { ok: true };
+  }
+
+  // --- Phase: TEAM_VOTE ---
+
+  castVote(playerId, vote) {
+    if (this.phase !== PHASES.TEAM_VOTE) return { error: 'Not in voting phase' };
+    if (vote !== 'approve' && vote !== 'reject') return { error: 'Invalid vote' };
+    if (this.votes[playerId] != null) return { error: 'Already voted' };
+
+    this.votes[playerId] = vote;
+
+    if (Object.keys(this.votes).length === this.players.length) {
+      return this._resolveTeamVote();
+    }
+    return { ok: true, waiting: true };
+  }
+
+  _resolveTeamVote() {
+    const approvals = Object.values(this.votes).filter(v => v === 'approve').length;
+    const approved = approvals > this.players.length / 2;
+
+    this.voteHistory.push({
+      quest: this.currentQuest,
+      leader: this.players[this.currentLeaderIdx].name,
+      team: this.teamProposal.map(pid => this.players.find(p => p.id === pid).name),
+      votes: { ...this.votes },
+      approved,
+    });
+
+    if (approved) {
+      this.consecutiveRejects = 0;
+      this.questVotes = {};
+      this.phase = PHASES.QUEST;
+      return { ok: true, approved: true };
+    }
+
+    this.consecutiveRejects++;
+    if (this.consecutiveRejects >= 5) {
+      this.phase = PHASES.GAME_OVER;
+      this.winner = 'EVIL';
+      this.winReason = '5 consecutive team rejections';
+      return { ok: true, approved: false, gameOver: true };
+    }
+
+    this.currentLeaderIdx = (this.currentLeaderIdx + 1) % this.players.length;
+    this._startTeamProposal();
+    return { ok: true, approved: false };
+  }
+
+  // --- Phase: QUEST ---
+
+  questVote(playerId, vote) {
+    if (this.phase !== PHASES.QUEST) return { error: 'Not in quest phase' };
+    if (!this.teamProposal.includes(playerId)) return { error: 'You are not on this quest' };
+    if (vote !== 'success' && vote !== 'fail') return { error: 'Invalid vote' };
+    if (this.questVotes[playerId] != null) return { error: 'Already voted' };
+
+    const player = this.getPlayer(playerId);
+    if (player.team === 'GOOD' && vote === 'fail') {
+      return { error: 'Good players must play success' };
+    }
+
+    this.questVotes[playerId] = vote;
+
+    if (Object.keys(this.questVotes).length === this.teamProposal.length) {
+      return this._resolveQuest();
+    }
+    return { ok: true, waiting: true };
+  }
+
+  _resolveQuest() {
+    const fails = Object.values(this.questVotes).filter(v => v === 'fail').length;
+    const needsDoubleFail = this.config.doubleFail[this.currentQuest];
+    const questFailed = needsDoubleFail ? fails >= 2 : fails >= 1;
+
+    this.questResults.push({
+      quest: this.currentQuest,
+      result: questFailed ? 'fail' : 'success',
+      fails,
+      teamSize: this.teamProposal.length,
+    });
+
+    const successes = this.questResults.filter(q => q.result === 'success').length;
+    const failures = this.questResults.filter(q => q.result === 'fail').length;
 
     if (failures >= 3) {
       this.phase = PHASES.GAME_OVER;
       this.winner = 'EVIL';
       this.winReason = '3 quests failed';
-      return { ok: true, gameOver: true };
+      return { ok: true, questFailed, gameOver: true };
     }
 
     if (successes >= 3) {
-      const hasMerlin = this.players.some(p => p.role === 'MERLIN');
       const hasAssassin = this.players.some(p => p.role === 'ASSASSIN');
-      if (hasMerlin && hasAssassin) {
+      const hasMerlin = this.players.some(p => p.role === 'MERLIN');
+      if (hasAssassin && hasMerlin) {
         this.phase = PHASES.ASSASSIN_GUESS;
-        return { ok: true, assassinPhase: true };
+        return { ok: true, questFailed: false, assassinPhase: true };
       }
       this.phase = PHASES.GAME_OVER;
       this.winner = 'GOOD';
       this.winReason = '3 quests succeeded';
-      return { ok: true, gameOver: true };
+      return { ok: true, questFailed: false, gameOver: true };
     }
 
-    return { ok: true };
+    this.currentQuest++;
+    this.consecutiveRejects = 0;
+    this.currentLeaderIdx = (this.currentLeaderIdx + 1) % this.players.length;
+    this._startTeamProposal();
+    return { ok: true, questFailed };
   }
 
   // --- Phase: ASSASSIN_GUESS ---
@@ -188,8 +298,14 @@ class Game {
 
   restart() {
     this.phase = PHASES.LOBBY;
+    this.currentLeaderIdx = 0;
     this.currentQuest = 0;
     this.questResults = [];
+    this.teamProposal = [];
+    this.votes = {};
+    this.questVotes = {};
+    this.consecutiveRejects = 0;
+    this.voteHistory = [];
     this.acknowledgedPlayers = new Set();
     this.winner = null;
     this.winReason = null;
@@ -208,6 +324,7 @@ class Game {
 
   getStateForPlayer(playerId) {
     const player = this.getPlayer(playerId);
+    const isLeader = this.players[this.currentLeaderIdx]?.id === playerId;
 
     const state = {
       gameId: this.id,
@@ -217,11 +334,14 @@ class Game {
         name: p.name,
         connected: p.connected,
         isHost: p.id === this.hostId,
+        isLeader: this.players[this.currentLeaderIdx]?.id === p.id,
+        isOnTeam: this.teamProposal.includes(p.id),
       })),
       currentQuest: this.currentQuest,
       questResults: this.questResults,
       questSizes: this.config.questSizes,
       doubleFail: this.config.doubleFail,
+      consecutiveRejects: this.consecutiveRejects,
     };
 
     if (player) {
@@ -229,6 +349,8 @@ class Game {
         id: player.id,
         name: player.name,
         isHost: player.id === this.hostId,
+        isLeader,
+        isOnTeam: this.teamProposal.includes(player.id),
       };
 
       if (this.phase !== PHASES.LOBBY) {
@@ -247,13 +369,29 @@ class Game {
       state.enabledRoles = this.config.roles;
     }
 
-    if (this.phase === PHASES.QUEST_TRACK) {
-      state.questSizeNeeded = this.config.questSizes[this.currentQuest];
-      state.doubleFailNeeded = this.config.doubleFail[this.currentQuest];
+    if (this.phase === PHASES.TEAM_PROPOSAL) {
+      state.requiredTeamSize = this.config.questSizes[this.currentQuest];
+    }
+
+    if (this.phase === PHASES.TEAM_VOTE) {
+      state.teamProposal = this.teamProposal.map(pid => {
+        const p = this.players.find(pl => pl.id === pid);
+        return { id: pid, name: p ? p.name : '?' };
+      });
+      state.votesSubmitted = Object.keys(this.votes).length;
+      state.youVoted = this.votes[playerId] != null;
+    }
+
+    if (this.phase === PHASES.QUEST) {
+      state.teamProposal = this.teamProposal.map(pid => {
+        const p = this.players.find(pl => pl.id === pid);
+        return { id: pid, name: p ? p.name : '?' };
+      });
+      state.questVotesSubmitted = Object.keys(this.questVotes).length;
+      state.youVoted = this.questVotes[playerId] != null;
     }
 
     if (this.phase === PHASES.ASSASSIN_GUESS) {
-      // Only show assassin UI to the assassin
       state.isAssassin = player?.role === 'ASSASSIN';
     }
 
@@ -265,6 +403,15 @@ class Game {
         name: p.name,
         role: ROLES[p.role]?.name || p.role,
         team: p.team,
+      }));
+      state.voteHistory = this.voteHistory.map(vh => ({
+        ...vh,
+        votes: Object.fromEntries(
+          Object.entries(vh.votes).map(([pid, v]) => {
+            const p = this.players.find(pl => pl.id === pid);
+            return [p ? p.name : pid, v];
+          })
+        ),
       }));
     }
 

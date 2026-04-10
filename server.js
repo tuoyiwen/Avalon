@@ -42,6 +42,22 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
+  socket.on('leave-game', (_, cb) => {
+    if (!currentGameId) return cb({ error: 'Not in a game' });
+    const game = gameManager.getGame(currentGameId);
+    if (game) {
+      game.removePlayer(socket.id);
+      socket.leave(currentGameId);
+      if (game.players.length === 0) {
+        gameManager.removeGame(currentGameId);
+      } else {
+        broadcastGameState(game);
+      }
+    }
+    currentGameId = null;
+    cb({ ok: true });
+  });
+
   socket.on('configure-game', (config, cb) => {
     const game = gameManager.getGame(currentGameId);
     if (!game) return cb({ error: 'Not in a game' });
@@ -70,19 +86,36 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
-  // Host records quest results (game happens offline)
-  socket.on('record-quest', ({ result }, cb) => {
+  socket.on('propose-team', ({ team }, cb) => {
     const game = gameManager.getGame(currentGameId);
     if (!game) return cb({ error: 'Not in a game' });
-    if (socket.id !== game.hostId) return cb({ error: 'Only the host can record quests' });
 
-    const res = game.recordQuestResult(result);
-    if (res.error) return cb({ error: res.error });
+    const result = game.proposeTeam(socket.id, team);
+    if (result.error) return cb({ error: result.error });
     cb({ ok: true });
     broadcastGameState(game);
   });
 
-  // Host records assassin's guess
+  socket.on('cast-vote', ({ vote }, cb) => {
+    const game = gameManager.getGame(currentGameId);
+    if (!game) return cb({ error: 'Not in a game' });
+
+    const result = game.castVote(socket.id, vote);
+    if (result.error) return cb({ error: result.error });
+    cb({ ok: true });
+    broadcastGameState(game);
+  });
+
+  socket.on('quest-vote', ({ vote }, cb) => {
+    const game = gameManager.getGame(currentGameId);
+    if (!game) return cb({ error: 'Not in a game' });
+
+    const result = game.questVote(socket.id, vote);
+    if (result.error) return cb({ error: result.error });
+    cb({ ok: true });
+    broadcastGameState(game);
+  });
+
   socket.on('assassin-guess', ({ targetId }, cb) => {
     const game = gameManager.getGame(currentGameId);
     if (!game) return cb({ error: 'Not in a game' });

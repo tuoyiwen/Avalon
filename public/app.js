@@ -51,6 +51,23 @@ const T = {
     playNarration: 'Play Narration',
     stopNarration: 'Stop',
     narrating: 'Narrating...',
+    leaveRoom: 'Leave Room',
+    selectTeam: 'Select your team',
+    proposeTeam: 'Propose Team',
+    choosingTeam: 'is choosing a team',
+    rejects: 'Rejects',
+    proposedTeam: 'Proposed Team',
+    votes: 'Votes',
+    approve: 'Approve',
+    reject: 'Reject',
+    waitingVotes: 'Waiting for votes',
+    team: 'Team',
+    playCard: 'Play your card',
+    success: 'Success',
+    fail: 'Fail',
+    questInProgress: 'Quest in progress',
+    leader: 'Leader',
+    onTeam: 'On Team',
     // Role names
     roleMerlin: 'Merlin',
     rolePercival: 'Percival',
@@ -117,6 +134,23 @@ const T = {
     playNarration: '播放语音播报',
     stopNarration: '停止',
     narrating: '语音播报中...',
+    leaveRoom: '退出房间',
+    selectTeam: '选择队伍',
+    proposeTeam: '确认出队',
+    choosingTeam: '正在选择队伍',
+    rejects: '否决次数',
+    proposedTeam: '提议的队伍',
+    votes: '投票',
+    approve: '同意',
+    reject: '反对',
+    waitingVotes: '等待投票中',
+    team: '队伍',
+    playCard: '请出牌',
+    success: '成功',
+    fail: '失败',
+    questInProgress: '任务进行中',
+    leader: '车头',
+    onTeam: '上车',
     // Role names
     roleMerlin: '梅林',
     rolePercival: '派西维尔',
@@ -333,6 +367,7 @@ function applyStaticText() {
   $('labelMordred').textContent = 'Mordred / ' + t('roleMordred');
   $('labelOberon').textContent = 'Oberon / ' + t('roleOberon');
   $('startBtn').textContent = t('startGame');
+  $('leaveBtn').textContent = lang === 'zh' ? '退出房间' : 'Leave Room';
   // Role reveal
   $('revealTitle').textContent = t('yourRole');
   $('ackBtn').textContent = t('seenRole');
@@ -431,12 +466,41 @@ $('startBtn').onclick = () => emit('start-game', {});
 $('ackBtn').onclick = () => emit('acknowledge-role', {});
 $('restartBtn').onclick = () => emit('restart-game', {});
 
-// --- Quest Recording (host only) ---
-function recordQuest(result) {
-  emit('record-quest', { result });
+// --- Leave Game ---
+function leaveGame() {
+  emit('leave-game', {}, () => {
+    saved.gameId = '';
+    saved.name = '';
+    state = null;
+    selectedTeam = new Set();
+    assassinTarget = null;
+    show('home');
+  });
 }
 
-// --- Assassin Guess (host records) ---
+// --- Team Proposal ---
+let selectedTeam = new Set();
+
+$('proposeBtn').onclick = () => {
+  emit('propose-team', { team: Array.from(selectedTeam) });
+};
+
+function togglePlayer(id) {
+  if (selectedTeam.has(id)) selectedTeam.delete(id);
+  else selectedTeam.add(id);
+  render(state);
+}
+
+// --- Voting ---
+function castVote(vote) {
+  emit('cast-vote', { vote });
+}
+
+function questVote(vote) {
+  emit('quest-vote', { vote });
+}
+
+// --- Assassin Guess ---
 $('assassinBtn').onclick = () => {
   if (!assassinTarget) return toast(t('selectPlayer'));
   emit('assassin-guess', { targetId: assassinTarget });
@@ -455,8 +519,7 @@ function renderQuestBoard(containerId, st) {
     let cls = 'quest-slot';
     if (i === st.currentQuest && st.phase !== 'GAME_OVER') cls += ' current';
     const result = st.questResults[i];
-    if (result === 'success') cls += ' success';
-    else if (result === 'fail') cls += ' fail';
+    if (result) cls += result.result === 'success' ? ' success' : ' fail';
     const df = st.doubleFail[i] ? '<div class="df">2F</div>' : '';
     return `<div class="${cls}"><span>${size}</span>${df}</div>`;
   }).join('');
@@ -482,7 +545,9 @@ function render(s) {
   switch (s.phase) {
     case 'LOBBY': renderLobby(s); break;
     case 'ROLE_REVEAL': renderRoleReveal(s); break;
-    case 'QUEST_TRACK': renderQuestTrack(s); break;
+    case 'TEAM_PROPOSAL': renderTeamProposal(s); break;
+    case 'TEAM_VOTE': renderTeamVote(s); break;
+    case 'QUEST': renderQuest(s); break;
     case 'ASSASSIN_GUESS': renderAssassin(s); break;
     case 'GAME_OVER': renderGameOver(s); break;
   }
@@ -535,13 +600,11 @@ function renderRoleReveal(s) {
     $('revealKnown').innerHTML = `<h3>${t('noKnowledge')}</h3>`;
   }
 
-  // Narration controls (host only)
   if (s.you?.isHost) {
     $('narrationControls').style.display = '';
     $('playNarrationBtn').textContent = t('playNarration');
     $('playNarrationBtn').onclick = () => playNarration(s.enabledRoles);
     $('stopNarrationBtn').textContent = t('stopNarration');
-    // Auto-start narration on first render
     if (!narrationAutoStarted && !narrationPlaying) {
       narrationAutoStarted = true;
       playNarration(s.enabledRoles);
@@ -551,27 +614,91 @@ function renderRoleReveal(s) {
   }
 }
 
-function renderQuestTrack(s) {
-  show('questTrack');
-  renderQuestBoard('qtQuestBoard', s);
-  renderRoleBar('qtRoleBar', s);
-  $('qtQuestLabel').textContent = t('quest');
-  $('qtQuestNum').textContent = s.currentQuest + 1;
-  $('qtTeamSizeLabel').textContent = t('teamSize') + ': ';
-  $('qtTeamSize').textContent = s.questSizeNeeded;
-  $('qtDoubleFail').textContent = t('needs2Fails');
-  $('qtDoubleFail').style.display = s.doubleFailNeeded ? '' : 'none';
+function renderTeamProposal(s) {
+  show('teamProposal');
+  renderQuestBoard('tpQuestBoard', s);
+  renderRoleBar('tpRoleBar', s);
+  $('tpQuestLabel').textContent = t('quest');
+  $('tpQuestNum').textContent = s.currentQuest + 1;
+  $('tpTeamSizeLabel').textContent = t('teamSize');
+  $('tpTeamSize').textContent = s.requiredTeamSize;
+  $('tpRejectLabel').textContent = t('rejects');
+  $('tpRejects').textContent = s.consecutiveRejects;
 
-  if (s.you?.isHost) {
-    $('qtHostView').style.display = '';
-    $('qtPlayerView').style.display = 'none';
-    $('qtHostInstruction').textContent = t('hostInstruction');
-    $('qtSuccessBtn').textContent = t('questSuccess');
-    $('qtFailBtn').textContent = t('questFail');
+  const leader = s.players.find(p => p.isLeader);
+
+  if (s.you?.isLeader) {
+    $('tpLeaderView').style.display = '';
+    $('tpWaitView').style.display = 'none';
+    $('tpSelectLabel').textContent = t('selectTeam');
+
+    selectedTeam = new Set([...selectedTeam].filter(id => s.players.some(p => p.id === id)));
+
+    $('tpPlayerList').innerHTML = s.players.map(p => {
+      const sel = selectedTeam.has(p.id) ? ' selected' : '';
+      const you = p.id === s.you.id ? ` <span class="badge badge-you">${t('you')}</span>` : '';
+      return `<li class="player-item${sel}" onclick="togglePlayer('${p.id}')"><span>${p.name}${you}</span></li>`;
+    }).join('');
+
+    $('proposeBtn').disabled = selectedTeam.size !== s.requiredTeamSize;
+    $('proposeBtn').textContent = `${t('proposeTeam')} (${selectedTeam.size}/${s.requiredTeamSize})`;
   } else {
-    $('qtHostView').style.display = 'none';
-    $('qtPlayerView').style.display = '';
-    $('qtPlayerText').textContent = t('playerInstruction');
+    $('tpLeaderView').style.display = 'none';
+    $('tpWaitView').style.display = '';
+    $('tpLeaderName').textContent = leader ? leader.name : '?';
+    $('tpChoosingText').textContent = t('choosingTeam');
+  }
+}
+
+function renderTeamVote(s) {
+  show('teamVote');
+  renderQuestBoard('tvQuestBoard', s);
+  renderRoleBar('tvRoleBar', s);
+  $('tvProposedLabel').textContent = t('proposedTeam');
+
+  $('tvTeamList').innerHTML = s.teamProposal.map(p =>
+    `<li class="player-item"><span>${p.name}</span><span class="badge badge-team">${t('onTeam')}</span></li>`
+  ).join('');
+
+  $('tvVotesLabel').textContent = t('votes');
+  $('tvVoteCount').textContent = s.votesSubmitted;
+  $('tvTotalPlayers').textContent = s.players.length;
+  $('tvApproveBtn').textContent = t('approve');
+  $('tvRejectBtn').textContent = t('reject');
+
+  if (s.youVoted) {
+    $('tvButtons').style.display = 'none';
+    $('tvWaiting').style.display = '';
+    $('tvWaitText').textContent = t('waitingVotes');
+  } else {
+    $('tvButtons').style.display = '';
+    $('tvWaiting').style.display = 'none';
+  }
+}
+
+function renderQuest(s) {
+  show('quest');
+  renderQuestBoard('qQuestBoard', s);
+  renderRoleBar('qRoleBar', s);
+  $('qQuestLabel').textContent = t('quest');
+  $('qQuestNum').textContent = s.currentQuest + 1;
+  $('qTeamLabel').textContent = t('team');
+  $('qTeamNames').textContent = s.teamProposal.map(p => p.name).join(', ');
+  $('qVoteCount').textContent = s.questVotesSubmitted;
+  $('qTeamSize').textContent = s.teamProposal.length;
+  $('qSuccessBtn').textContent = t('success');
+  $('qFailBtn').textContent = t('fail');
+  $('qPlayCardText').textContent = t('playCard');
+  $('qWaitText').textContent = t('questInProgress');
+
+  const isOnTeam = s.you?.isOnTeam;
+  if (isOnTeam && !s.youVoted) {
+    $('qVoteView').style.display = '';
+    $('qWaiting').style.display = 'none';
+    $('qFailBtn').style.display = s.you.team === 'GOOD' ? 'none' : '';
+  } else {
+    $('qVoteView').style.display = 'none';
+    $('qWaiting').style.display = '';
   }
 }
 
@@ -614,6 +741,7 @@ function renderGameOver(s) {
 
   $('restartBtn').style.display = s.you?.isHost ? '' : 'none';
   assassinTarget = null;
+  selectedTeam = new Set();
   narrationAutoStarted = false;
   stopNarration();
 }
