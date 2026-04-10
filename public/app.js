@@ -87,6 +87,10 @@ function updateConfig() {
 
 $('startBtn').onclick = () => emit('start-game', {});
 
+// --- AI Players ---
+$('addAIBtn').onclick = () => emit('add-ai', {});
+$('removeAIBtn').onclick = () => emit('remove-ai', {});
+
 // --- Role Acknowledge ---
 $('ackBtn').onclick = () => emit('acknowledge-role', {});
 
@@ -174,9 +178,15 @@ function renderLobby(s) {
   $('lobbyPlayers').innerHTML = s.players.map(p => {
     const badges = [];
     if (p.isHost) badges.push('<span class="badge badge-host">Host</span>');
+    if (p.isAI) badges.push('<span class="badge badge-ai">AI</span>');
     if (p.id === s.you?.id) badges.push('<span class="badge badge-you">You</span>');
     return `<li class="player-item"><span>${p.name}</span><span>${badges.join(' ')}</span></li>`;
   }).join('');
+
+  // AI buttons visible only to host
+  $('aiButtons').style.display = s.you?.isHost ? '' : 'none';
+  const hasAI = s.players.some(p => p.isAI);
+  $('removeAIBtn').disabled = !hasAI;
 
   if (s.you?.isHost) {
     $('configPanel').style.display = '';

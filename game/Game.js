@@ -17,7 +17,8 @@ class Game {
     this.hostId = hostId;
     this.phase = PHASES.LOBBY;
 
-    this.players = [{ id: hostId, name: hostName, role: null, team: null, connected: true }];
+    this.players = [{ id: hostId, name: hostName, role: null, team: null, connected: true, isAI: false }];
+    this.aiCounter = 0;
 
     // Config (set by host in lobby, defaults applied on start)
     this.config = {
@@ -59,8 +60,29 @@ class Game {
     if (this.players.find(p => p.name === name)) {
       return { error: 'Name already taken' };
     }
-    this.players.push({ id, name, role: null, team: null, connected: true });
+    this.players.push({ id, name, role: null, team: null, connected: true, isAI: false });
     return { ok: true };
+  }
+
+  addAIPlayer() {
+    if (this.phase !== PHASES.LOBBY) return { error: 'Game already in progress' };
+    this.aiCounter++;
+    const name = `Bot ${this.aiCounter}`;
+    const id = `ai_${this.id}_${this.aiCounter}`;
+    this.players.push({ id, name, role: null, team: null, connected: true, isAI: true });
+    return { ok: true, id, name };
+  }
+
+  removeAIPlayer() {
+    if (this.phase !== PHASES.LOBBY) return { error: 'Game already in progress' };
+    const idx = this.players.findIndex(p => p.isAI);
+    if (idx === -1) return { error: 'No AI players to remove' };
+    this.players.splice(idx, 1);
+    return { ok: true };
+  }
+
+  getAIPlayers() {
+    return this.players.filter(p => p.isAI);
   }
 
   removePlayer(id) {
@@ -335,6 +357,9 @@ class Game {
       p.role = null;
       p.team = null;
     }
+    // Remove AI players on restart so host can reconfigure
+    this.players = this.players.filter(p => !p.isAI);
+    this.aiCounter = 0;
   }
 
   // --- State for client ---
@@ -353,6 +378,7 @@ class Game {
         isLeader: this.players[this.currentLeaderIdx]?.id === p.id,
         isOnTeam: this.teamProposal.includes(p.id),
         isHost: p.id === this.hostId,
+        isAI: p.isAI || false,
       })),
       currentQuest: this.currentQuest,
       questResults: this.questResults,
