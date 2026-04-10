@@ -12,6 +12,26 @@ A web-based companion app for the board game **The Resistance: Avalon**. Players
 - **Mobile-Friendly** — Designed for phones, works on any device with a browser
 - **Flexible Players** — Supports 5-10 players with configurable good/evil ratio
 
+## Roles
+
+### Good Team (好人阵营)
+
+| Role | Description |
+|------|-------------|
+| **Loyal Servant** (忠臣) | No special abilities. Must work together to figure out who is evil. |
+| **Merlin** (梅林) | Knows who all the evil players are (except Mordred). Must stay hidden — if the Assassin identifies Merlin at the end, evil wins. |
+| **Percival** (派西维尔) | Sees both Merlin and Morgana, but can't tell which is which. Tries to protect the real Merlin. |
+
+### Evil Team (坏人阵营)
+
+| Role | Description |
+|------|-------------|
+| **Minion of Mordred** (爪牙) | Knows the other evil players. Tries to sabotage quests without being caught. |
+| **Assassin** (刺客) | Knows the other evil players. If good wins 3 quests, the Assassin gets one final chance to guess who Merlin is — a correct guess wins the game for evil. |
+| **Morgana** (莫甘娜) | Appears as Merlin to Percival. Creates confusion about who the real Merlin is. |
+| **Mordred** (莫德雷德) | Invisible to Merlin. The most hidden evil player — Merlin cannot identify Mordred. |
+| **Oberon** (奥伯伦) | A lone wolf. Doesn't know the other evil players, and they don't know Oberon either. |
+
 ## How to Play
 
 1. One person creates a game and shares the room code
