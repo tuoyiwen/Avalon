@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Web-based Avalon board game",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js"
   },
